@@ -18,7 +18,7 @@
 - 难度为轻松飞／竞速赛／高手场；简单档给 AI 起跑宽限，高手档的答题模式才开启障碍物。
 - 默认是辅助驾驶：左摇杆前进／转向、自动保持目标高度、松手悬停；「找环」只转向目标，不代替玩家前进。专业驾驶保留双摇杆。
 - 支持桌面 WASD、Q 加速、V 视角、F 全屏、Esc 暂停；手机支持双拇指摇杆加加速。
-- 能量会自然恢复；暂停、切换应用和失焦会冻结比赛与清除输入；最佳成绩只存本机 `localStorage`。
+- 能量会自然恢复；暂停、切换应用和失焦会冻结比赛与清除输入；最佳成绩存本机 `localStorage`，有班级代码时额外同步到云端排行榜（见下）。
 - 场景是程序化日光竞技场，不含外部模型／贴图：割草草场、看台、围网、远景绿丘、树与标识。手机关闭 bloom，连续低帧率会逐级直出渲染并降低 DPR。
 - **班级排行榜（2026-09-14 新增，选配）**：网址带 `?code=` 班级代码（或本机记住过 kelasku 代码）时，进场前会先弹「选你的名字」（接 `kongsi-idea` 的 `ClassCode`/`supabaseClient`，跟 `tahun1-bc-bishun` 同一套），完成后主画面出现「班级排行榜」按钮，穿环竞速／答题竞速分开两张榜，按当前难度过滤、只在同一个 `play_code` 内比较。数据表 `tahun1to6_drone_scores` + RPC `submit_tahun1to6_drone_score`（`kongsi-idea/supabase/migration-2026-09-14-tahun1to6-drone-scores.sql`）。排行按 `mode + difficulty` 分榜，不分年级/学科——跟本机最佳成绩的 key 保持同一套简化逻辑，是刻意的取舍不是漏做。跟 `liangci_scores`/`bishun_progress` 同一套 RLS 模型：anon key 公开、读取全表开放，没有做防伪签名——教室内激励用途，不是有奖竞赛，接受这个已知取舍。
 
@@ -34,6 +34,6 @@
 
 ## 验证与交接
 
-- 运行 `python3 tests/test_game.py`。它要求本机 `http://127.0.0.1:8746/` 已运行，覆盖三种视口、双触点、暂停、穿环、答题、结算、本机储存与重玩。
+- 运行 `python3 tests/test_game.py`。它要求本机 `http://127.0.0.1:8746/` 已运行，覆盖三种视口、双触点、暂停、穿环、答题、结算、本机储存与重玩、班级排行榜身份流程。**这份测试在 Claude Code 这台沙盒里会持续 `wait_for_function` timeout**（headless 渲染环境限制，已用 `git stash` 切回旧版重跑同一份测试证实是环境问题不是代码问题）；沙盒里改用 Playwright MCP 交互式浏览器逐步验证即可，`python3 tests/test_game.py` 留给普通 Terminal 跑。
 - 浏览器临时证据放在 `../playwright-to-delete/drone-upgrade/`。原版 `index.before.html` 是唯一未 Git 化回退参考，在用户决定弃置前不可删除。
 - 已于 2026-09-14 发布上架并按老师要求加了班级排行榜；题库仍是待审起始包，正式课堂使用前仍需老师核对内容，不要把这点当成已经解决。
