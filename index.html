@@ -1,0 +1,2095 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="飞学竞场" />
+<meta name="theme-color" content="#20372b" />
+<link rel="manifest" href="manifest.json" />
+<title>飞学竞场 · 飞行学习挑战</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; overscroll-behavior: none; touch-action: none;
+    background: #0b1620; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  #canvas-holder { position: fixed; inset: 0; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  #hud {
+    position: fixed; inset: 0; pointer-events: none;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  #top-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; row-gap: 8px;
+    padding: 14px 16px; gap: 12px;
+  }
+  #title-chip {
+    color: #cfe8ff; font-size: 13px; font-weight: 600; white-space: nowrap; flex-shrink: 0;
+    background: rgba(10, 20, 30, .45); border: 1px solid rgba(255,255,255,.12);
+    padding: 6px 12px; border-radius: 999px; letter-spacing: .02em;
+    backdrop-filter: blur(6px);
+  }
+  #top-right-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  #battery-wrap {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(10, 20, 30, .45); border: 1px solid rgba(255,255,255,.12);
+    padding: 6px 10px 6px 12px; border-radius: 999px; backdrop-filter: blur(6px);
+  }
+  .mini-btn {
+    pointer-events: auto; height: 34px; padding: 0 12px; border-radius: 999px;
+    background: rgba(10, 20, 30, .45); border: 1px solid rgba(255,255,255,.18);
+    color: #cfe8ff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(6px); white-space: nowrap;
+  }
+  .mini-btn.active { background: rgba(46, 196, 255, .55); border-color: #fff; }
+  #battery-label { color: #9fd8ff; font-size: 12px; font-weight: 700; min-width: 34px; text-align: right; }
+  #battery-track {
+    width: 110px; height: 10px; border-radius: 6px; background: rgba(255,255,255,.12);
+    overflow: hidden; border: 1px solid rgba(255,255,255,.15);
+  }
+  #battery-fill {
+    height: 100%; width: 50%; border-radius: 6px;
+    background: linear-gradient(90deg, #37e08e, #7dffb0);
+    transition: width .12s linear, background .2s linear;
+  }
+  #battery-fill.low { background: linear-gradient(90deg, #ff5d5d, #ff9d5d); }
+
+  #sticks-row {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding: 0 22px 22px; pointer-events: none;
+  }
+  .stick-zone {
+    width: 132px; height: 132px; border-radius: 50%;
+    background: rgba(255,255,255,.06); border: 2px solid rgba(255,255,255,.18);
+    position: relative; pointer-events: auto; touch-action: none;
+    backdrop-filter: blur(2px);
+  }
+  .stick-knob {
+    position: absolute; width: 56px; height: 56px; border-radius: 50%;
+    left: 50%; top: 50%; transform: translate(-50%, -50%);
+    background: radial-gradient(circle at 35% 30%, #7fd3ff, #2a8fd6);
+    border: 2px solid rgba(255,255,255,.6);
+    box-shadow: 0 4px 12px rgba(0,0,0,.35);
+  }
+  .stick-tag {
+    position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; color: rgba(255,255,255,.5); white-space: nowrap;
+  }
+
+  #boost-btn {
+    position: absolute; bottom: 168px; left: 40px; pointer-events: auto;
+    width: 84px; height: 84px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffe27a, #ff9f2e);
+    border: 2px solid rgba(255,255,255,.55);
+    color: #3a2200; font-weight: 800; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 16px rgba(0,0,0,.4);
+    touch-action: none; opacity: .55; transition: opacity .15s, transform .1s;
+  }
+  #boost-btn.active { opacity: 1; transform: scale(0.94); }
+  #boost-btn.empty { filter: grayscale(1); opacity: .35; }
+
+  #center-msg {
+    position: fixed; bottom: 258px; left: 50%; transform: translateX(-50%);
+    color: #fff; background: rgba(0,0,0,.55); padding: 14px 20px; border-radius: 12px;
+    font-size: 14px; text-align: center; max-width: 78vw; line-height: 1.6;
+    pointer-events: none; opacity: 0; transition: opacity .3s;
+  }
+  #center-msg.show { opacity: 1; }
+
+  #score-chip {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .01em;
+    background: rgba(10, 20, 30, .5); border: 1px solid rgba(255,255,255,.16);
+    padding: 6px 12px; border-radius: 999px; backdrop-filter: blur(6px);
+    display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  #score-chip .timer { color: #ffe27a; font-variant-numeric: tabular-nums; margin-left: 4px; }
+  #score-chip .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  #score-chip .who { display: inline-flex; align-items: center; gap: 3px; }
+
+  #end-screen {
+    position: fixed; inset: 0; z-index: 20;
+    background: rgba(6, 12, 20, .78); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #end-screen[hidden] { display: none; }
+  #end-card {
+    background: rgba(20, 32, 44, .95); border: 1px solid rgba(255,255,255,.15);
+    border-radius: 18px; padding: 26px 30px; text-align: center; color: #fff;
+    max-width: 84vw;
+  }
+  #end-title { font-size: 20px; font-weight: 800; margin-bottom: 10px; }
+  #end-score { font-size: 28px; font-weight: 800; margin-bottom: 18px; color: #9fd8ff; }
+  #restart-btn {
+    background: linear-gradient(90deg, #37e08e, #2ec4ff); border: none;
+    color: #06202a; font-weight: 800; font-size: 15px;
+    padding: 12px 26px; border-radius: 999px;
+  }
+
+  #start-screen {
+    position: fixed; inset: 0; z-index: 25;
+    background: rgba(6, 12, 20, .85); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #start-screen[hidden] { display: none; }
+  #start-card {
+    background: rgba(20, 32, 44, .95); border: 1px solid rgba(255,255,255,.15);
+    border-radius: 18px; padding: 28px 30px; text-align: center; color: #fff;
+    max-width: 86vw; width: 280px;
+  }
+  .start-title { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+  .start-sub { font-size: 13px; color: #9fd8ff; margin-bottom: 18px; }
+  .diff-btn {
+    display: block; width: 100%; margin: 8px 0; padding: 13px 20px;
+    border-radius: 999px; border: none; font-weight: 800; font-size: 15px;
+    color: #06202a; background: linear-gradient(90deg, #37e08e, #2ec4ff);
+  }
+  .diff-btn[data-diff="normal"] { background: linear-gradient(90deg, #ffcf5c, #ff9f2e); }
+  .diff-btn[data-diff="hard"] { background: linear-gradient(90deg, #ff6a6a, #ff2ecf); color: #fff; }
+
+  #quiz-banner {
+    position: absolute; top: 62px; left: 50%; transform: translateX(-50%);
+    background: rgba(10, 20, 30, .55); border: 1px solid rgba(255,255,255,.18);
+    color: #fff; padding: 8px 18px; border-radius: 14px; font-size: 15px; font-weight: 700;
+    backdrop-filter: blur(6px); text-align: center; max-width: 82vw; white-space: nowrap;
+  }
+  #quiz-banner[hidden] { display: none; }
+
+  :root { --ink:#20312b; --paper:#f5f6f0; --muted:#a8b7af; --accent:#e8b64d; --panel:rgba(22,35,30,.92); }
+  button, select { font:inherit; cursor:pointer; }
+  button:focus-visible, select:focus-visible { outline:3px solid #ffe09a; outline-offset:4px; }
+  [hidden] { display:none !important; }
+  body { color:var(--paper); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+  #hud, #score-chip, #quiz-banner, #boost-btn, #flight-info, #target-marker, #mini-map, #answer-radar { visibility:hidden; }
+  body.playing #hud, body.playing #score-chip, body.playing #quiz-banner, body.playing #boost-btn, body.playing #flight-info, body.playing #target-marker, body.playing #mini-map, body.playing #answer-radar { visibility:visible; }
+  #start-screen { background:linear-gradient(90deg,rgba(12,28,21,.95),rgba(12,28,21,.78) 47%,rgba(12,28,21,.06)); backdrop-filter:none; justify-content:flex-start; padding:clamp(20px,5vw,76px); overflow:auto; touch-action:pan-y; }
+  #start-card { width:min(520px,95vw); max-width:none; text-align:left; padding:0; border:0; background:none; border-radius:0; }
+  .eyebrow { color:#eac976; font-size:11px; letter-spacing:.2em; font-weight:700; margin:0 0 14px; }
+  .start-title { font-size:clamp(32px,5vw,64px); line-height:1.06; font-weight:850; letter-spacing:-.045em; margin:0 0 14px; }
+  .start-title span { display:block; font-size:.38em; letter-spacing:.14em; font-weight:500; margin-top:12px; }
+  .start-sub { color:#d0dad1; font-size:14px; line-height:1.7; max-width:36em; margin:0 0 22px; }
+  .mode-switch { display:flex; gap:6px; padding:4px; background:rgba(255,255,255,.09); border-radius:12px; margin-bottom:12px; }
+  .mode-btn { flex:1; padding:11px 8px; color:#d3dcd5; background:none; border:0; border-radius:8px; font-size:14px; font-weight:700; }
+  .mode-btn.active { background:#f0f1e8; color:#243b2b; }
+  .level-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .diff-btn, .diff-btn[data-diff="normal"], .diff-btn[data-diff="hard"] { color:#f5f6ef; background:rgba(246,250,234,.09); border:1px solid rgba(220,235,216,.22); border-radius:12px; padding:14px 10px; margin:0; font-size:15px; text-align:left; }
+  .diff-btn[data-diff="easy"] { background:#e8b64d; color:#2e2817; border-color:#e8b64d; }
+  .diff-btn small { display:block; font-size:11px; font-weight:450; opacity:.8; margin-top:6px; }
+  .diff-btn:active, .primary:active { transform:translateY(1px); }
+  #practice-btn { background:none; border:1px solid #8b9e8d; color:#edf1e8; padding:12px; border-radius:10px; width:100%; margin-top:10px; font-weight:650; }
+  .settings-line { display:flex; gap:16px; align-items:center; margin-top:16px; font-size:12px; color:#cbd8cd; }
+  select { background:#263b30; color:#fff; border:1px solid #647969; border-radius:7px; padding:8px; max-width:100%; }
+  .menu-note { font-size:11px; color:#aabbb0; line-height:1.6; margin:14px 0 0; }
+  #load-status { color:#e8c875; font-size:12px; margin:12px 0; }
+  #start-screen.loading .diff-btn, #start-screen.loading #practice-btn { opacity:.45; pointer-events:none; }
+  #top-bar { padding:12px 16px; align-items:flex-start; }
+  #title-chip { border:0; background:var(--panel); border-radius:8px; font-size:12px; color:#e8eddf; padding:10px 12px; }
+  #top-right-controls { flex-wrap:nowrap; gap:6px; }
+  .mini-btn { background:var(--panel); color:#edf1e7; border-radius:8px; height:40px; min-width:42px; border-color:rgba(225,237,217,.2); backdrop-filter:none; }
+  .mini-btn.active { background:#3d5846; border-color:#829b77; }
+  #battery-wrap { display:none; }
+  #score-chip { top:max(12px,env(safe-area-inset-top)); padding:10px 14px; border-radius:10px; background:var(--panel); gap:12px; font-size:14px; backdrop-filter:none; }
+  #score-chip .timer { color:#edca76; margin-left:8px; }
+  #quiz-banner { top:66px; max-width:min(560px,70vw); white-space:normal; padding:9px 16px; font-size:17px; background:var(--panel); border-radius:10px; backdrop-filter:none; line-height:1.5; }
+  #quiz-banner small { display:block; font-size:11px; font-weight:500; color:#c3cec1; }
+  #answer-radar { position:fixed; right:16px; top:76px; width:min(240px,27vw); padding:10px 12px; border:1px solid #c6d2b750; border-radius:10px; background:var(--panel); color:#eef2e8; font-size:11px; line-height:1.55; pointer-events:none; }
+  #answer-radar b { display:block; color:#e7c971; font-size:12px; margin-bottom:4px; }
+  #answer-radar span { display:block; font-variant-numeric:tabular-nums; }
+  #sticks-row { padding:0 max(30px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(30px,env(safe-area-inset-left)); }
+  .stick-zone { width:144px; height:144px; border:1px solid rgba(247,255,231,.4); background:rgba(20,34,24,.24); backdrop-filter:none; box-shadow:inset 0 0 0 25px rgba(230,246,218,.045); }
+  .stick-knob { width:58px; height:58px; background:rgba(240,242,219,.75); border:2px solid #f3f4dc; box-shadow:0 3px 10px #14211755; }
+  .stick-tag { bottom:10px; font-size:11px; color:#fff; text-shadow:0 1px 4px #000; }
+  body.assisted #stick-right { visibility:hidden; pointer-events:none; }
+  body.practice #score-chip .who:not(:first-child) { display:none; }
+  body.practice #score-chip .who:first-child::before { content:'已穿环'; color:#cbd8bd; font-size:11px; margin-right:4px; }
+  #boost-btn { left:auto; right:max(40px,env(safe-area-inset-right)); bottom:max(30px,env(safe-area-inset-bottom)); width:104px; height:104px; opacity:1; border:2px solid #e9d699; background:#293c2ee8; color:#ffdf90; box-shadow:0 4px 24px #152b2555; font-size:17px; flex-direction:column; gap:5px; }
+  #boost-btn small { font-size:11px; font-weight:500; color:#d2d9bd; }
+  #boost-btn.active { background:#dca643; color:#172a21; }
+  #align-btn { display:none; position:fixed; right:max(54px,env(safe-area-inset-right)); bottom:148px; padding:10px 14px; min-height:42px; border:1px solid #d4dbb466; border-radius:10px; color:#f6f3d4; background:#263c2ddc; z-index:2; font-size:12px; }
+  body.playing.assisted #align-btn { display:block; }
+  body:not(.assisted) #boost-btn { bottom:190px; right:60px; width:70px; height:70px; font-size:13px; }
+  #flight-info { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); font-size:12px; text-align:center; color:#fff; text-shadow:0 1px 5px #15291f; pointer-events:none; }
+  #flight-info strong { font-size:22px; font-variant-numeric:tabular-nums; }
+  #flight-info small { display:block; margin-top:5px; font-size:11px; }
+  #center-msg { bottom:auto; top:32%; max-width:min(480px,74vw); background:rgba(19,37,26,.94); border:1px solid #cedf9e55; border-radius:12px; padding:12px 20px; z-index:30; font-size:15px; }
+  #target-marker { position:fixed; top:0; left:0; pointer-events:none; color:#fff4ca; font-weight:750; font-size:12px; text-align:center; text-shadow:0 2px 4px #102117; transform:translate(-50%,-100%); }
+  #target-marker b { display:block; font-size:26px; line-height:1.2; }
+  #mini-map { position:fixed; left:18px; top:76px; width:104px; height:104px; border-radius:50%; background:rgba(21,37,27,.75); border:1px solid #ccd9b944; pointer-events:none; }
+  #pause-screen { position:fixed; inset:0; background:#11241bd9; backdrop-filter:blur(8px); z-index:40; display:grid; place-items:center; }
+  .pause-card { color:#f3f5e8; text-align:center; max-width:450px; padding:24px; }
+  .pause-card h2 { font-size:28px; margin:0 0 12px; }
+  .pause-card p { line-height:1.7; color:#c4d1c4; font-size:13px; }
+  .primary, .secondary, #restart-btn { border:0; border-radius:10px; padding:13px 24px; font-weight:750; background:#e8b64d; color:#2c2b18; font-size:14px; }
+  .secondary { background:#3b5140; color:#edf2df; margin:8px; }
+  #end-screen { background:#11251bd9; z-index:35; overflow:auto; touch-action:pan-y; }
+  #end-card { background:#20372bec; border-color:#72916766; border-radius:20px; max-width:90vw; width:430px; padding:28px; }
+  #end-title { font-size:26px; }
+  #end-score { color:#f3df9d; font-size:17px; line-height:1.7; margin:12px 0; }
+  .result-row { display:flex; justify-content:space-between; padding:5px 12px; color:#cddaca; font-size:14px; }
+  .result-row.you { background:#ffffff10; border-radius:8px; color:#ffe2a0; }
+  #end-detail { font-size:13px; color:#c4d1c4; line-height:1.7; margin:14px 0; }
+  #orientation-note { display:none; position:fixed; bottom:12px; left:50%; transform:translateX(-50%); font-size:12px; z-index:28; padding:8px 14px; border-radius:8px; background:#182c21; white-space:nowrap; }
+  @media (pointer:fine) { #sticks-row { display:none; } #boost-btn { width:66px; height:66px; font-size:12px; } #flight-info small::after { content:' · WASD 飞行 · Q 加速 · Esc 暂停'; } }
+  @media (max-height:500px) and (orientation:landscape) {
+    #start-screen { padding:18px max(24px,env(safe-area-inset-left)); }
+    #start-card { width:min(600px,85vw); display:grid; grid-template-columns:1fr 1.15fr; column-gap:24px; align-items:start; }
+    .menu-heading { grid-column:1; grid-row:1 / span 4; align-self:center; }
+    .start-title { font-size:36px; } .start-sub { margin:16px 0 0; font-size:12px; }
+    .menu-options { grid-column:2; } .eyebrow { font-size:9px; margin-bottom:12px; }
+    .diff-btn { padding:11px 8px; font-size:13px; } .diff-btn small { font-size:10px; }
+    .mode-btn { padding:8px 4px; font-size:12px; } #practice-btn { padding:10px; }
+    .settings-line { margin-top:8px; gap:6px; font-size:10px; } select { padding:6px; font-size:11px; }
+    .menu-note { font-size:10px; margin-top:7px; } #load-status { margin:5px 0; font-size:10px; }
+    #top-bar { padding:8px max(10px,env(safe-area-inset-right)) 8px max(10px,env(safe-area-inset-left)); }
+    #title-chip { display:none; } #top-right-controls { margin-left:auto; gap:4px; }
+    .mini-btn { height:36px; min-width:36px; padding:0 8px; font-size:11px; }
+    #sound-btn { display:none; } #score-chip { left:max(12px,env(safe-area-inset-left)); transform:none; top:8px; font-size:12px; padding:9px; gap:8px; }
+    #quiz-banner { top:8px; max-width:36vw; padding:6px 10px; font-size:13px; } #quiz-banner small { font-size:10px; }
+    .stick-zone { width:120px; height:120px; } .stick-knob { width:48px; height:48px; }
+    #sticks-row { padding-bottom:16px; } #boost-btn { width:86px; height:86px; bottom:20px; right:30px; }
+    #align-btn { bottom:122px; right:35px; }
+    body:not(.assisted) #boost-btn { bottom:154px; width:58px; height:58px; right:56px; }
+    #mini-map { width:78px; height:78px; top:54px; left:16px; } #answer-radar { right:10px; top:60px; width:180px; font-size:10px; padding:7px 9px; }
+    #flight-info { bottom:12px; } #center-msg { top:30%; padding:8px 14px; font-size:13px; }
+    #end-card { width:540px; padding:16px 24px; } #end-title { font-size:22px; margin-bottom:4px; } #end-score { margin:5px 0; line-height:1.4; } .result-row { padding:2px 12px; } #end-detail { margin:8px 0; }
+  }
+  @media (orientation:portrait) and (max-width:600px) { #orientation-note { display:block; } #start-screen { align-items:flex-start; padding-top:8vh; padding-bottom:55px; background:rgba(12,28,21,.88); } #score-chip { top:60px; } #quiz-banner { top:108px; max-width:88vw; } #mini-map { top:170px; width:75px; height:75px; } #answer-radar { top:260px; width:160px; } #top-bar { padding-top:max(12px,env(safe-area-inset-top)); } #flight-info small { max-width:130px; } }
+  #quiz-banner { width:min(620px,60vw); max-width:none; padding:12px 18px; text-align:left; }
+  #quiz-banner .question-meta { color:#d7c48d; font-size:11px; letter-spacing:.06em; margin-bottom:5px; }
+  #quiz-banner .question-text { font-size:clamp(17px,2.3vw,26px); font-weight:750; line-height:1.4; overflow-wrap:anywhere; }
+  #quiz-banner .question-phase { display:flex; justify-content:space-between; gap:12px; margin-top:8px; font-size:12px; color:#dce5d6; }
+  #quiz-banner progress { width:100%; height:4px; accent-color:#e8b64d; display:block; margin-top:8px; }
+  #answer-radar { inset:0; width:auto; padding:0; border:0; background:none; }
+  .answer-pointer { position:absolute; transform:translate(-50%,-50%); display:flex; align-items:center; gap:5px; padding:5px 8px; border:1px solid #e6d29b; border-radius:9px; background:#16231ef2; color:#fff2c9; }
+  .answer-pointer .pointer-arrow { display:block; font-size:25px; line-height:1; transform-origin:center; }
+  .answer-pointer .pointer-letter { font-size:16px; font-weight:800; }
+  #answer-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px 14px; margin-top:8px; font-size:13px; line-height:1.4; }
+  #answer-options span { overflow-wrap:anywhere; }
+  body.quiz-playing #align-btn { display:none !important; }
+  @media (max-height:500px) { #quiz-banner { top:8px; width:46vw; padding:7px 10px; } #quiz-banner .question-text { font-size:16px; } #quiz-banner .question-meta { font-size:10px; margin-bottom:2px; } #quiz-banner .question-phase { font-size:10px; margin-top:4px; } #answer-options { font-size:11px; gap:3px 8px; margin-top:5px; } }
+  @media (orientation:portrait) and (max-width:600px) { #quiz-banner { top:108px; width:90vw; } }
+  @media (prefers-reduced-motion:reduce) { * { transition:none !important; } }
+</style>
+</head>
+<body>
+  <div id="canvas-holder"></div>
+
+  <div id="hud">
+    <div id="top-bar">
+      <div id="title-chip">飞学 · 竞场</div>
+      <div id="top-right-controls">
+        <div id="battery-wrap">
+          <div id="battery-track"><div id="battery-fill"></div></div>
+          <div id="battery-label">50%</div>
+        </div>
+        <button id="fpv-btn" class="mini-btn" title="切换视角">视角</button>
+        <button id="fullscreen-btn" class="mini-btn" title="全屏">全屏</button>
+        <button id="sound-btn" class="mini-btn active" title="声音">声音</button>
+        <button id="pause-btn" class="mini-btn" title="暂停游戏">暂停</button>
+      </div>
+    </div>
+
+    <div id="sticks-row">
+      <div class="stick-zone" id="stick-left">
+        <div class="stick-knob" id="knob-left"></div>
+        <div class="stick-tag">油门 / 偏航</div>
+      </div>
+      <div class="stick-zone" id="stick-right">
+        <div class="stick-knob" id="knob-right"></div>
+        <div class="stick-tag">俯仰 / 横滚</div>
+      </div>
+    </div>
+  </div>
+
+  <button id="boost-btn" aria-label="按住加速">加速<small id="boost-energy">100%</small></button>
+  <button id="align-btn" title="转向下一环，不会自动前进">↻ 找环</button>
+  <div id="score-chip">
+    <span class="who"><span class="dot" style="background:#2ec4ff"></span><span id="score-player">0</span></span>
+    <span class="who"><span class="dot" style="background:#ff5d7a"></span><span id="score-ai-0">0</span></span>
+    <span class="who"><span class="dot" style="background:#ffa64d"></span><span id="score-ai-1">0</span></span>
+    <span class="who"><span class="dot" style="background:#b56dff"></span><span id="score-ai-2">0</span></span>
+    <span class="timer" id="match-timer">3:00</span>
+  </div>
+  <div id="quiz-banner" hidden></div>
+  <div id="center-msg" role="status" aria-live="polite"></div>
+  <div id="target-marker"><b>▽</b><span></span></div>
+  <canvas id="mini-map" width="208" height="208" aria-label="赛道位置图"></canvas>
+  <div id="answer-radar" hidden aria-live="polite"></div>
+  <div id="flight-info"><strong id="speed-value">0</strong> km/h<small id="flight-hint">松手悬停</small></div>
+  <div id="orientation-note">横过手机，飞行视野更开阔</div>
+
+  <div id="start-screen" class="loading">
+    <div id="start-card">
+      <div class="menu-heading"><p class="eyebrow">OPEN AIR / DRONE CLUB</p>
+        <h1 class="start-title">飞学竞场<span>在飞行中思考，在挑战中学习。</span></h1>
+        <p class="start-sub">掠过草地，穿过光环。<br>从第一次起飞，到把答案飞出来。</p>
+      </div>
+      <div class="menu-options">
+        <div class="mode-switch" aria-label="选择玩法"><button class="mode-btn active" data-mode="race" aria-pressed="true">穿环竞速</button><button class="mode-btn" data-mode="quiz" aria-pressed="false">答题竞速</button></div>
+        <div class="level-grid">
+          <button class="diff-btn" data-diff="easy">轻松飞<small>慢速对手 · 好上手</small></button>
+          <button class="diff-btn" data-diff="normal">竞速赛<small>路线与加速</small></button>
+          <button class="diff-btn" data-diff="hard">高手场<small>更快 · 更有挑战</small></button>
+        </div>
+        <div class="settings-line"><label for="year-select">年级</label><select id="year-select"><option value="1">Tahun 1</option><option value="2">Tahun 2</option><option value="3">Tahun 3</option><option value="4">Tahun 4</option><option value="5">Tahun 5</option><option value="6">Tahun 6</option></select><label for="subject-select">科目</label><select id="subject-select"><option value="mixed">综合学科</option><option value="math">数学</option><option value="science">科学</option><option value="bm">Bahasa Melayu</option><option value="bi">English</option><option value="bc">华文</option><option value="history">Sejarah（四至六年级）</option></select></div>
+        <div class="settings-line"><label for="map-select">地图</label><select id="map-select"><option value="near">近场</option><option value="standard" selected>标准</option><option value="expedition">远征</option></select><button id="practice-btn">重做飞行试炼</button></div>
+        <div class="settings-line"><label for="control-select">操控</label><select id="control-select"><option value="assist">辅助驾驶 · 自动定高</option><option value="pro">专业驾驶 · 双摇杆</option></select><button id="menu-sound" class="mini-btn">声音 开</button></div>
+        <p class="menu-note" id="best-note">一场 90 秒 · 无淘汰 · 随时暂停</p>
+        <p id="load-status" role="status">正在准备飞行场…</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="end-screen" hidden>
+    <div id="end-card">
+      <div id="end-title">比赛结束</div>
+      <div id="end-score">玩家 0 : 0 AI</div>
+      <div id="end-detail"></div>
+      <button id="restart-btn">再来一局</button>
+      <button id="menu-btn" class="secondary">回竞场</button>
+    </div>
+  </div>
+
+  <div id="pause-screen" hidden><div class="pause-card"><p class="eyebrow">TAKE A BREATH</p><h2>歇一歇，随时继续</h2><p id="pause-help"></p><button id="resume-btn" class="primary">继续飞行</button><button id="pause-menu-btn" class="secondary">回竞场</button><p>切换应用时自动暂停，不会偷偷跑掉比赛时间。</p></div></div>
+
+<script>
+window.addEventListener('error', function(e) {
+  const label = document.getElementById('load-status');
+  if (label && document.getElementById('start-screen').classList.contains('loading')) label.textContent = '飞行场未能载入，请检查网络后刷新。';
+});
+setTimeout(function() { const label = document.getElementById('load-status'); if (document.getElementById('start-screen').classList.contains('loading')) label.textContent = '载入比平时久，请检查网络后刷新。'; }, 15000);
+</script>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+/* ---------- 场景基础 ---------- */
+const holder = document.getElementById("canvas-holder");
+const coarsePointer = matchMedia('(pointer: coarse)').matches;
+const renderer = new THREE.WebGLRenderer({ antialias: !coarsePointer, alpha: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, coarsePointer ? 1.35 : 1.5));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; // 电影感色调映射，取代死板的平光渲染
+renderer.toneMappingExposure = 0.92;
+holder.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+
+// 渐层天空（画布生成的径向渐变，取代单色天空，早晚感更丰富）
+function makeSkyTexture() {
+  const c = document.createElement("canvas");
+  c.width = 2; c.height = 256;
+  const ctx = c.getContext("2d");
+  const g = ctx.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0, "#3f7fd6");
+  g.addColorStop(0.45, "#7fbfe8");
+  g.addColorStop(0.75, "#cfe9f2");
+  g.addColorStop(1, "#f4e3b8");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 2, 256);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+scene.background = makeSkyTexture();
+scene.fog = new THREE.Fog(0x9fc2d4, 70, 210); // 颜色不那么泛白、拉远起雾距离，避免近处也蒙上白雾
+
+// 合成摄影棚环境反光：让金属/清漆材质（机身、球门）有柔和反光，但调低强度避免整体发白
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.35;
+
+const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 800);
+
+// 后期处理：轻微辉光（bloom）——阈值调高、强度调低，只让真正的高光/发光物件晕开，不再糊白整个画面
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), coarsePointer ? 0 : 0.18, 0.28, 0.96);
+bloomPass.enabled = !coarsePointer;
+composer.addPass(bloomPass);
+composer.addPass(new OutputPass());
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* 灯光 */
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 0.65));
+const sun = new THREE.DirectionalLight(0xffffff, 0.95);
+sun.position.set(20, 30, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(coarsePointer ? 1024 : 1536, coarsePointer ? 1024 : 1536);
+sun.shadow.camera.left = -60;
+sun.shadow.camera.right = 60;
+sun.shadow.camera.top = 60;
+sun.shadow.camera.bottom = -60;
+sun.shadow.camera.near = 5;
+sun.shadow.camera.far = 110;
+sun.shadow.bias = -0.0018;
+scene.add(sun);
+scene.add(sun.target);
+
+/* 场地：条纹球场草皮（贴近真实球场割草纹理，取代纯色平面） */
+const ARENA = 50; // 半宽（比原本大很多，配合球门会换位置，逼玩家探索整张地图）
+function makeGrassTexture() {
+  const c = document.createElement("canvas");
+  c.width = 512; c.height = 512;
+  const ctx = c.getContext("2d");
+  const stripes = 10;
+  for (let i = 0; i < stripes; i++) {
+    ctx.fillStyle = i % 2 === 0 ? "#347e45" : "#2d7340";
+    ctx.fillRect(0, (512 / stripes) * i, 512, 512 / stripes);
+  }
+  // Fine, low-contrast blade variation reads as mown turf without a noisy shader.
+  for (let i = 0; i < 12000; i++) {
+    const x = Math.random() * 512, y = Math.random() * 512;
+    const v = 75 + Math.floor(Math.random() * 35);
+    ctx.fillStyle = `rgba(${v - 30},${v + 45},${v - 10},${0.08 + Math.random() * 0.1})`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1, 1);
+  return tex;
+}
+const groundGeo = new THREE.PlaneGeometry(ARENA * 2, ARENA * 2, 20, 20);
+const groundMat = new THREE.MeshStandardMaterial({ map: makeGrassTexture() });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// 场地标线（中圈＋中线＋边框），画在透明贴图上叠在草皮之上，取代空白的死板方块场地
+function makeMarkingsTexture() {
+  const c = document.createElement("canvas");
+  c.width = 1024; c.height = 1024;
+  const ctx = c.getContext("2d");
+  ctx.strokeStyle = "rgba(255,255,255,0.5)";
+  ctx.lineWidth = 5;
+  ctx.strokeRect(24, 24, 1024 - 48, 1024 - 48);
+  ctx.beginPath(); ctx.moveTo(512, 24); ctx.lineTo(512, 1000); ctx.stroke();
+  ctx.beginPath(); ctx.arc(512, 512, 130, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(512, 512, 7, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.fill();
+  const tex = new THREE.CanvasTexture(c);
+  return tex;
+}
+const markings = new THREE.Mesh(
+  new THREE.PlaneGeometry(ARENA * 2 - 2, ARENA * 2 - 2),
+  new THREE.MeshStandardMaterial({ map: makeMarkingsTexture(), transparent: true, depthWrite: false, roughness: 1 })
+);
+markings.rotation.x = -Math.PI / 2;
+markings.position.y = 0.03;
+scene.add(markings);
+
+// Subtle perimeter mowing lines; avoid a game-like grid across the whole pitch.
+const fieldEdge = new THREE.Mesh(
+  new THREE.PlaneGeometry(ARENA * 2 - 1.5, ARENA * 2 - 1.5),
+  new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.025, wireframe: true })
+);
+fieldEdge.rotation.x = -Math.PI / 2;
+fieldEdge.position.y = 0.025;
+scene.add(fieldEdge);
+
+// 边界安全网（仿真实无人机竞速场地的护网，取代死板的实心矮墙）
+function makeNetTexture() {
+  const c = document.createElement("canvas");
+  c.width = 128; c.height = 128;
+  const ctx = c.getContext("2d");
+  ctx.strokeStyle = "rgba(255,255,255,0.45)";
+  ctx.lineWidth = 1.6;
+  for (let i = -128; i < 256; i += 16) {
+    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + 128, 128); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(i, 128); ctx.lineTo(i + 128, 0); ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(ARENA / 2.6, 1.4);
+  return tex;
+}
+const wallMat = new THREE.MeshStandardMaterial({
+  map: makeNetTexture(), transparent: true, opacity: 0.34, side: THREE.DoubleSide, depthWrite: false,
+});
+[[0, ARENA], [0, -ARENA], [ARENA, 0], [-ARENA, 0]].forEach(([x, z]) => {
+  const horizontal = x === 0;
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(ARENA * 2, 7), wallMat);
+  wall.position.set(x, 3.5, z);
+  if (!horizontal) wall.rotation.y = Math.PI / 2;
+  scene.add(wall);
+});
+
+// Sparse backdrop planting and fence uprights give the net a believable scale cue.
+// Each element is instanced so the detail costs only one draw call per material.
+const postGeo = new THREE.CylinderGeometry(0.075, 0.1, 7.2, 6);
+const postMat = new THREE.MeshStandardMaterial({ color: 0x34484a, roughness: 0.8, metalness: 0.15 });
+const posts = new THREE.InstancedMesh(postGeo, postMat, 48);
+const postMatrix = new THREE.Matrix4(); let postIndex = 0;
+for (const [axis, sign] of [[0, -1], [0, 1], [1, -1], [1, 1]]) {
+  for (let i = 0; i < 12; i++) {
+    const along = -ARENA + 2 + i * ((ARENA * 2 - 4) / 11);
+    postMatrix.makeTranslation(axis === 0 ? along : sign * ARENA, 3.6, axis === 0 ? sign * ARENA : along);
+    posts.setMatrixAt(postIndex++, postMatrix);
+  }
+}
+posts.instanceMatrix.needsUpdate = true; posts.castShadow = true; scene.add(posts);
+
+const trunkGeo = new THREE.CylinderGeometry(0.28, 0.42, 4.5, 7);
+const crownGeo = new THREE.SphereGeometry(2.25, 10, 7);
+const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4b4438, roughness: 1 });
+const crownMat = new THREE.MeshStandardMaterial({ color: 0x315c3c, roughness: 0.95 });
+const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, 16);
+const crowns = new THREE.InstancedMesh(crownGeo, crownMat, 16);
+const treeMatrix = new THREE.Matrix4();
+for (let i = 0; i < 16; i++) {
+  const a = (i / 16) * Math.PI * 2 + 0.18;
+  const radius = 67 + (i % 3) * 3.5;
+  const x = Math.sin(a) * radius, z = Math.cos(a) * radius;
+  const scale = 0.82 + (i % 4) * 0.08;
+  treeMatrix.compose(new THREE.Vector3(x, 2.25, z), new THREE.Quaternion(), new THREE.Vector3(scale, scale, scale));
+  trunks.setMatrixAt(i, treeMatrix);
+  treeMatrix.compose(new THREE.Vector3(x, 6.0 + (i % 2) * 0.45, z), new THREE.Quaternion(), new THREE.Vector3(scale, scale, scale));
+  crowns.setMatrixAt(i, treeMatrix);
+}
+trunks.instanceMatrix.needsUpdate = true; crowns.instanceMatrix.needsUpdate = true;
+trunks.castShadow = crowns.castShadow = true; scene.add(trunks, crowns);
+
+/* 环场看台：四段连续的低矮看台，座椅用 InstancedMesh 保持真实尺度与低 draw call。 */
+const standRing = ARENA + 8;
+const standMat = new THREE.MeshStandardMaterial({ color: 0x536575, roughness: 0.88, metalness: 0.04 });
+const seatMat = new THREE.MeshStandardMaterial({ color: 0x9b4f3f, roughness: 0.76 });
+const railMat = new THREE.MeshStandardMaterial({ color: 0x27353e, roughness: 0.7, metalness: 0.3 });
+const standGroup = new THREE.Group();
+[[0, -1], [0, 1], [1, -1], [1, 1]].forEach(([axis, sign]) => {
+  const horizontal = axis === 0;
+  const tiers = 3;
+  const width = ARENA * 1.7;
+  for (let t = 0; t < tiers; t++) {
+    const depth = 3.2;
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(horizontal ? width : depth, 1.15, horizontal ? depth : width), standMat);
+    const inset = standRing + t * 3.0;
+    slab.position.set(horizontal ? 0 : sign * inset, 0.65 + t * 1.15, horizontal ? sign * inset : 0);
+    slab.receiveShadow = true;
+    standGroup.add(slab);
+  }
+  const seatGeo = new THREE.BoxGeometry(horizontal ? 1.35 : 0.34, 0.22, horizontal ? 0.34 : 1.35);
+  const seats = new THREE.InstancedMesh(seatGeo, seatMat, 3 * 20);
+  const m = new THREE.Matrix4(); let n = 0;
+  for (let row = 0; row < 3; row++) for (let col = 0; col < 20; col++) {
+    const along = -ARENA * 0.82 + col * (ARENA * 1.64 / 19);
+    const inset = standRing + row * 3.0;
+    m.makeTranslation(horizontal ? along : sign * inset, 1.35 + row * 1.15, horizontal ? sign * inset : along);
+    seats.setMatrixAt(n++, m);
+  }
+  seats.instanceMatrix.needsUpdate = true;
+  seats.castShadow = true; seats.receiveShadow = true;
+  standGroup.add(seats);
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(horizontal ? width : 0.12, 0.12, horizontal ? 0.12 : width), railMat);
+  rail.position.set(horizontal ? 0 : sign * (standRing + 7.2), 4.2, horizontal ? sign * (standRing + 7.2) : 0);
+  standGroup.add(rail);
+});
+scene.add(standGroup);
+
+// Small venue identity boards add scale and a believable competition setting.
+function makeVenueSignTexture() {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 96;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#14272b'; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.fillStyle = '#d7b56d'; ctx.fillRect(0, 0, c.width, 5); ctx.fillRect(0, c.height - 5, c.width, 5);
+  ctx.fillStyle = '#edf3e5'; ctx.font = '700 30px Arial'; ctx.textAlign = 'center';
+  ctx.fillText('OPEN AIR  ·  DRONE CLUB', c.width / 2, 60);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; return tex;
+}
+const signMat = new THREE.MeshStandardMaterial({ map: makeVenueSignTexture(), roughness: 0.72, metalness: 0.05 });
+[[0, -1], [0, 1], [1, -1], [1, 1]].forEach(([axis, sign]) => {
+  const horizontal = axis === 0;
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(12, 2.25), signMat);
+  board.position.set(horizontal ? 0 : sign * (standRing + 7.05), 4.05, horizontal ? sign * (standRing + 7.05) : 0);
+  board.rotation.y = horizontal ? (sign < 0 ? 0 : Math.PI) : (sign < 0 ? Math.PI / 2 : -Math.PI / 2);
+  board.castShadow = true; scene.add(board);
+});
+
+/* 远山：用「空间连贯」的噪声位移取代每点独立乱跳的随机抖动，避免碎玻璃／水晶质感；
+   再按高度分层上色（山脚深绿棕→中段岩灰→山顶浅雪白），读起来才像真的山而不是拼色块 */
+function terrainNoise(x, z) {
+  // 几层不同频率的正弦叠加＝便宜版的连贯噪声：相邻点的值会平滑过渡，不是各自独立随机
+  return (
+    Math.sin(x * 0.12 + 1.3) * Math.cos(z * 0.1 + 0.7) * 0.6 +
+    Math.sin(x * 0.05 - z * 0.07 + 3.1) * 0.9 +
+    Math.sin((x + z) * 0.19 + 2.0) * 0.35
+  );
+}
+const hillMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, vertexColors: true });
+const HILL_BASE = new THREE.Color(0x284f35);
+const HILL_MID = new THREE.Color(0x4f8050);
+const HILL_PEAK = new THREE.Color(0x83a66a);
+function buildHill(radius, height, seed) {
+  const geo = new THREE.SphereGeometry(radius, 20, 12);
+  const posAttr = geo.attributes.position;
+  const colors = new Float32Array(posAttr.count * 3);
+  const v = new THREE.Vector3();
+  const c = new THREE.Color();
+  for (let i = 0; i < posAttr.count; i++) {
+    v.fromBufferAttribute(posAttr, i);
+    const n = terrainNoise(v.x + seed, v.z + seed); // 用世界坐标取样，相邻顶点自然平滑过渡
+    v.multiplyScalar(1 + n * 0.13);
+    v.y *= height / radius;
+    if (v.y < 0) v.y *= 0.2; // 压平底部，避免悬空像陨石
+    posAttr.setXYZ(i, v.x, v.y, v.z);
+
+    const t = THREE.MathUtils.clamp(v.y / height, 0, 1);
+    if (t < 0.6) c.copy(HILL_BASE).lerp(HILL_MID, t / 0.6);
+    else c.copy(HILL_MID).lerp(HILL_PEAK, (t - 0.6) / 0.4);
+    colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  return new THREE.Mesh(geo, hillMat);
+}
+for (let i = 0; i < 8; i++) {
+  const angle = (i / 10) * Math.PI * 2 + 0.3;
+  const dist = ARENA + 52 + Math.random() * 22;
+  const hill = buildHill(14 + Math.random() * 10, 16 + Math.random() * 14, i * 37.5);
+  hill.position.set(Math.sin(angle) * dist, -2, Math.cos(angle) * dist);
+  scene.add(hill);
+}
+
+// Keep the horizon clean and photographic; cloud motion remains compatible downstream.
+const clouds = [];
+
+/* ---------- 无人机建模（流线机身＋碳纤维手臂＋高速虚影旋翼＋云台镜头） ---------- */
+function setShadow(mesh) { mesh.castShadow = true; mesh.receiveShadow = true; return mesh; }
+
+function buildDrone(bodyColor) {
+  const group = new THREE.Group();
+
+  // 机身外壳：椭圆胶囊造型，比方盒子更接近真实穿越机流线机身
+  const shellMat = new THREE.MeshPhysicalMaterial({
+    color: bodyColor, metalness: 0.25, roughness: 0.32, clearcoat: 0.6, clearcoatRoughness: 0.25,
+  });
+  const shell = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.5, 6, 14), shellMat);
+  shell.rotation.x = Math.PI / 2;
+  shell.scale.set(1, 0.62, 0.86);
+  setShadow(shell);
+  group.add(shell);
+
+  // 机身顶部隆起的电池舱盖
+  const canopy = new THREE.Mesh(
+    new THREE.SphereGeometry(0.24, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0x14181c, metalness: 0.5, roughness: 0.4 })
+  );
+  canopy.position.y = 0.1;
+  canopy.scale.set(1.15, 0.7, 0.85);
+  setShadow(canopy);
+  group.add(canopy);
+
+  // 机身下方悬吊的云台镜头——之前误放在机身侧边（+X），导致左右不对称、直飞时看起来像歪一边；
+  // 改到机头正前方中线（-Z，跟前进方向一致），左右对称
+  const gimbalArm = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.18, 6), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+  gimbalArm.position.set(0, -0.2, -0.12);
+  group.add(gimbalArm);
+  const gimbal = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshStandardMaterial({ color: 0x0a0a0a, metalness: 0.6, roughness: 0.3 }));
+  gimbal.position.set(0, -0.3, -0.12);
+  setShadow(gimbal);
+  group.add(gimbal);
+  const lens = new THREE.Mesh(new THREE.CircleGeometry(0.045, 12), new THREE.MeshStandardMaterial({ color: 0x2a6ea8, metalness: 0.9, roughness: 0.1 }));
+  lens.position.set(0, -0.3, -0.2);
+  lens.rotation.y = Math.PI;
+  group.add(lens);
+
+  // 碳纤维质感的四支斜置机臂（X 构型）
+  const armMat = new THREE.MeshStandardMaterial({ color: 0x1b1d1f, metalness: 0.55, roughness: 0.35 });
+  const armPositions = [
+    [0.78, 0.78], [0.78, -0.78], [-0.78, 0.78], [-0.78, -0.78]
+  ];
+  const rotors = [];
+  const propDiscs = [];
+
+  armPositions.forEach(([x, z]) => {
+    const armLen = Math.hypot(x, z) * 1.05;
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.06, armLen, 8), armMat);
+    arm.position.set(x / 2, -0.02, z / 2);
+    arm.rotation.z = Math.PI / 2;
+    arm.rotation.y = -Math.atan2(z, x);
+    setShadow(arm);
+    group.add(arm);
+
+    // 电机座
+    const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.16, 10), new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.7, roughness: 0.3 }));
+    motor.position.set(x, 0.06, z);
+    setShadow(motor);
+    group.add(motor);
+
+    // 机臂尖端指示灯（前蓝后红，仿真实穿越机导航灯）
+    const led = new THREE.Mesh(
+      new THREE.SphereGeometry(0.045, 8, 8),
+      new THREE.MeshStandardMaterial({ color: x > 0 ? 0x2ec4ff : 0xff3b3b, emissive: x > 0 ? 0x2ec4ff : 0xff3b3b, emissiveIntensity: 1.4 })
+    );
+    led.position.set(x * 1.06, 0.02, z * 1.06);
+    group.add(led);
+
+    // 旋翼：两片薄叶片 + 高速时显现的虚影圆盘
+    const bladeMat = new THREE.MeshStandardMaterial({ color: 0x0e0e0e, transparent: true, opacity: 0.88, side: THREE.DoubleSide });
+    const bladeGroup = new THREE.Group();
+    [0, Math.PI / 2].forEach(rot => {
+      const blade = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.5, 2, 6), bladeMat);
+      blade.rotation.z = Math.PI / 2;
+      blade.rotation.y = rot;
+      bladeGroup.add(blade);
+    });
+    bladeGroup.position.set(x, 0.15, z);
+    group.add(bladeGroup);
+    rotors.push(bladeGroup);
+
+    const disc = new THREE.Mesh(
+      new THREE.CircleGeometry(0.55, 24),
+      new THREE.MeshBasicMaterial({ color: 0xcfd8dc, transparent: true, opacity: 0, side: THREE.DoubleSide })
+    );
+    disc.rotation.x = -Math.PI / 2;
+    disc.position.set(x, 0.15, z);
+    group.add(disc);
+    propDiscs.push(disc);
+  });
+
+  const beacon = new THREE.PointLight(bodyColor, 1.4, 3.5);
+  beacon.position.set(0, 0.25, 0);
+  group.add(beacon);
+
+  group.userData.rotors = rotors;
+  group.userData.propDiscs = propDiscs;
+  return group;
+}
+
+const PLAYER_COLOR = 0x2ec4ff;
+const AI_COLORS = [0xff5d7a, 0xffa64d, 0xb56dff];
+const AI_NAMES = ["赤翼", "流光", "紫电"];
+
+const playerDrone = buildDrone(PLAYER_COLOR);
+scene.add(playerDrone);
+const aiDrones = AI_COLORS.map(color => {
+  const d = buildDrone(color);
+  scene.add(d);
+  return d;
+});
+
+/* ---------- 答案龙门：把选择题的每个答案挂在一个圆环上，冲过正确的那个才算答对 ---------- */
+const GOAL_Y = 3.5;
+const GOAL_HOLE_RADIUS = 2.3;      // 判定穿环的有效半径（比视觉圈略保守）
+const GOAL_RING_RADIUS = 3.0;      // 视觉圆环半径
+const GOAL_TUBE = 0.19;
+const ANSWER_RING_COLOR = 0xffe27a; // 所有答案圆环统一配色，不透露哪个是正确答案
+
+function buildAnswerRing(height = GOAL_Y) {
+  const group = new THREE.Group();
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(GOAL_RING_RADIUS, GOAL_TUBE, 12, 32),
+    new THREE.MeshStandardMaterial({ color: ANSWER_RING_COLOR, emissive: ANSWER_RING_COLOR, emissiveIntensity: 0.3, metalness: 0.4, roughness: 0.4 })
+  );
+  ring.rotation.y = Math.PI / 2; // 让圆环的「洞」朝向 X 轴方向
+  ring.castShadow = true;
+  group.add(ring);
+
+  const postMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+  const postHeight = Math.max(.3, height - GOAL_RING_RADIUS + .1);
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, postHeight, 8), postMat);
+  post.position.y = -height + postHeight / 2;
+  group.add(post);
+  const foot = new THREE.Mesh(new THREE.BoxGeometry(1.2,.12,1.7),postMat);
+  foot.position.y=-height+.06; foot.receiveShadow=true; group.add(foot);
+
+  return group; // 位置由 spawnQuestion() 每题随机指定
+}
+
+/* ---------- 电池道具 ---------- */
+const PICKUP_COUNT = 8;
+const pickups = [];
+function randomPickupPos() {
+  return new THREE.Vector3(
+    (Math.random() * 2 - 1) * (ARENA - 3),
+    1.6 + Math.random() * 2.2,
+    (Math.random() * 2 - 1) * (ARENA - 3)
+  );
+}
+for (let i = 0; i < PICKUP_COUNT; i++) {
+  const mesh = new THREE.Mesh(
+    new THREE.TorusGeometry(0.42, 0.14, 10, 24),
+    new THREE.MeshStandardMaterial({ color: 0xffe36b, emissive: 0x8a6a00, emissiveIntensity: 0.6 })
+  );
+  mesh.position.copy(randomPickupPos());
+  scene.add(mesh);
+  pickups.push({ mesh, active: true, respawnAt: 0 });
+}
+
+/* ---------- 移动障碍物：横放的警示圆柱，来回飘移，撞到会被弹开 ---------- */
+const OBSTACLE_COUNT = 6;
+const OBSTACLE_HIT_RADIUS = 1.75;
+const obstacles = [];
+function makeStripeTexture() {
+  const c = document.createElement("canvas");
+  c.width = 64; c.height = 64;
+  const ctx = c.getContext("2d");
+  for (let i = 0; i < 8; i++) {
+    ctx.fillStyle = i % 2 === 0 ? "#ff8800" : "#1a1a1a";
+    ctx.fillRect(0, i * 8, 64, 8);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(4, 1);
+  return tex;
+}
+for (let i = 0; i < OBSTACLE_COUNT; i++) {
+  const mesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.55, 0.55, 3.4, 12),
+    new THREE.MeshStandardMaterial({ map: makeStripeTexture(), roughness: 0.6 })
+  );
+  mesh.rotation.z = Math.PI / 2;
+  setShadow(mesh);
+  const base = new THREE.Vector3(
+    (Math.random() * 2 - 1) * (ARENA - 12),
+    2.2 + Math.random() * 6,
+    (Math.random() * 2 - 1) * (ARENA - 12)
+  );
+  mesh.position.copy(base);
+  scene.add(mesh);
+  obstacles.push({
+    mesh, base,
+    axis: Math.random() < 0.5 ? "x" : "z",
+    range: 7 + Math.random() * 7,
+    speed: 0.35 + Math.random() * 0.35,
+    phase: Math.random() * Math.PI * 2,
+  });
+}
+
+function updateObstacles(nowSec) {
+  obstacles.forEach(o => {
+    const offset = Math.sin(nowSec * o.speed + o.phase) * o.range;
+    if (o.axis === "x") o.mesh.position.x = o.base.x + offset;
+    else o.mesh.position.z = o.base.z + offset;
+    o.mesh.rotation.x += 0.02;
+  });
+}
+
+function checkObstacleHit(d, label) {
+  if (d.hitCooldown > 0) return;
+  for (const o of obstacles) {
+    if (d.pos.distanceTo(o.mesh.position) < OBSTACLE_HIT_RADIUS) {
+      const dir = d.pos.clone().sub(o.mesh.position);
+      if (dir.lengthSq() < 1e-4) dir.set(1, 0, 0); else dir.normalize();
+      d.vel.copy(dir).multiplyScalar(KNOCKBACK_SPEED * 0.75);
+      d.vel.y += 1;
+      d.hitCooldown = 0.5;
+      if (label === "player") { showMessage("撞到障碍物了！", 1000); if (navigator.vibrate) navigator.vibrate(50); }
+      break;
+    }
+  }
+}
+
+/* ---------- 状态：1 个玩家＋3 个 AI，绕场地中心四个方位出生，面朝中央 ---------- */
+const SPAWN_RADIUS = 11;
+const PLAYER_SPAWN = new THREE.Vector3(0, 3, SPAWN_RADIUS);
+const PLAYER_HEADING = 0; // 面向中央（-Z）
+const AI_SPAWNS = [
+  new THREE.Vector3(SPAWN_RADIUS, 3, 0),
+  new THREE.Vector3(0, 3, -SPAWN_RADIUS),
+  new THREE.Vector3(-SPAWN_RADIUS, 3, 0),
+];
+const AI_HEADINGS = [Math.PI / 2, Math.PI, -Math.PI / 2]; // 各自面向中央
+const MATCH_SECONDS = 90;
+const MAP_SCALES = { near: .74, standard: 1, expedition: 1.82 };
+
+function makeCombatant(spawn, heading) {
+  return { pos: spawn.clone(), prevPos: spawn.clone(), vel: new THREE.Vector3(), heading, tiltPitch: 0, tiltRoll: 0, hitCooldown: 0 };
+}
+
+const state = {
+  player: makeCombatant(PLAYER_SPAWN, PLAYER_HEADING),
+  ais: AI_SPAWNS.map((spawn, i) => ({ ...makeCombatant(spawn, AI_HEADINGS[i]), targetProp: null, targetOffset: new THREE.Vector3() })),
+  battery: 100,
+  boosting: false,
+  scores: { player: 0, ai: [0, 0, 0] },
+  matchTime: MATCH_SECONDS,
+  matchOver: false,
+  started: false,
+  difficulty: "normal",
+  mode: "race", control: "assist", practice: false, paused: false, countdown: 0,
+  year: 1, subject: "mixed", mapSize: "standard",
+  year: 1, subject: "mixed", mapSize: "standard",
+  elapsed: 0, combo: 0, bestCombo: 0, clean: 0, gates: 0, collisions: 0,
+};
+window.__debugState = state; // 便于自动化测试读取实时状态
+window.__debugObstacles = obstacles;
+
+// aimJitter：AI 瞄准目标时的固定偏差（越大越不准）；yawGain：转向反应；speedMult：飞行速度倍率
+const DIFFICULTY_PRESETS = {
+  easy:   { aimJitter: 0.8, yawGain: 1.5, speedMult: 0.36, guessAccuracy: 0.35, grace: 9 },
+  normal: { aimJitter: 0.45, yawGain: 2.0, speedMult: 0.63, guessAccuracy: 0.62, grace: 5 },
+  hard:   { aimJitter: 0.2, yawGain: 2.4, speedMult: 0.87, guessAccuracy: 0.83, grace: 2.8 },
+};
+
+/* ---------- 飞行马达音效：合成音（不是录音档），随速度／转弯／加速平滑变化，避免刺耳 ---------- */
+let audioCtx = null;
+let engine = null;
+let soundEnabled = true;
+window.__debugEngine = () => engine && { freq: engine.osc1.frequency.value, gain: engine.master.gain.value, turnGain: engine.turnGain.gain.value, noiseGain: engine.noiseGain.gain.value };
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  const master = audioCtx.createGain();
+  master.gain.value = 0;
+  master.connect(audioCtx.destination);
+
+  // 主马达音：两个略微错开音高的三角波叠加，过低通滤波磨掉刺耳高频，听起来像闷闷的嗡鸣而不是电子哔声
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = 700;
+  filter.connect(master);
+
+  const osc1 = audioCtx.createOscillator();
+  osc1.type = "triangle";
+  osc1.frequency.value = 85;
+  const osc2 = audioCtx.createOscillator();
+  osc2.type = "triangle";
+  osc2.frequency.value = 89;
+  osc1.connect(filter);
+  osc2.connect(filter);
+
+  // 转弯时才淡入的细微高频层，模拟「转弯时电机额外出力」，转得越猛越明显，但会平滑淡入淡出
+  const turnOsc = audioCtx.createOscillator();
+  turnOsc.type = "sine";
+  turnOsc.frequency.value = 210;
+  const turnGain = audioCtx.createGain();
+  turnGain.gain.value = 0;
+  turnOsc.connect(turnGain);
+  turnGain.connect(master);
+
+  // 宽频噪声层：查证过真实螺旋桨声由「音调＋宽频噪声」组成，纯音调听起来像电子哔声，加这层噪声才有「风声/桨叶噪声」的质感
+  const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+  const noiseData = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
+  const noiseSource = audioCtx.createBufferSource();
+  noiseSource.buffer = noiseBuffer;
+  noiseSource.loop = true;
+  const noiseFilter = audioCtx.createBiquadFilter();
+  noiseFilter.type = "bandpass";
+  noiseFilter.frequency.value = 500;
+  noiseFilter.Q.value = 0.7;
+  const noiseGain = audioCtx.createGain();
+  noiseGain.gain.value = 0;
+  noiseSource.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(master);
+
+  osc1.start(); osc2.start(); turnOsc.start(); noiseSource.start();
+  engine = { master, osc1, osc2, filter, turnOsc, turnGain, noiseFilter, noiseGain };
+}
+
+function updateEngineSound(playerInput, speedMult) {
+  if (!engine) return;
+  const now = audioCtx.currentTime;
+  const speed = Math.hypot(state.player.vel.x, state.player.vel.z) + Math.abs(state.player.vel.y) * 0.6;
+  const intensity = THREE.MathUtils.clamp(speed / (MAX_FWD_SPEED * BOOST_MULT), 0, 1);
+  const boosting = speedMult > 1.15;
+
+  const baseFreq = 78 + intensity * 130 + (boosting ? 18 : 0);
+  engine.osc1.frequency.setTargetAtTime(baseFreq, now, 0.18);
+  engine.osc2.frequency.setTargetAtTime(baseFreq * 1.045, now, 0.18);
+  engine.filter.frequency.setTargetAtTime(650 + intensity * 850 + (boosting ? 250 : 0), now, 0.25);
+
+  // 噪声层随速度增强并升高频段，模拟风声/桨叶噪声随转速变强变尖
+  engine.noiseFilter.frequency.setTargetAtTime(400 + intensity * 1400, now, 0.2);
+  const running = state.started && !state.matchOver && !state.paused && state.countdown <= 0;
+  engine.noiseGain.gain.setTargetAtTime(soundEnabled && running ? 0.02 + intensity * 0.05 : 0, now, 0.25);
+
+  const targetVol = soundEnabled && running ? 0.045 + intensity * 0.09 : 0;
+  engine.master.gain.setTargetAtTime(targetVol, now, 0.3);
+
+  const turnAmount = THREE.MathUtils.clamp(Math.abs(playerInput.yaw), 0, 1);
+  engine.turnGain.gain.setTargetAtTime(soundEnabled ? turnAmount * 0.03 : 0, now, 0.25);
+  engine.turnOsc.frequency.setTargetAtTime(200 + turnAmount * 90, now, 0.25);
+}
+
+const soundBtn = document.getElementById("sound-btn");
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  soundBtn.classList.toggle("active", soundEnabled);
+  soundBtn.textContent = soundEnabled ? "声音" : "静音";
+  document.getElementById("menu-sound").textContent = soundEnabled ? "声音 开" : "声音 关";
+  savePreferences();
+}
+soundBtn.addEventListener("click", toggleSound);
+document.getElementById("menu-sound").addEventListener("click", toggleSound);
+
+document.querySelectorAll(".diff-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    startGame(btn.dataset.diff, false);
+  });
+});
+
+const MAX_CLIMB = 5.5;
+const MAX_YAW_RATE = 2.3;
+const MAX_FWD_SPEED = 14;
+const MAX_LAT_SPEED = 9.5;
+const BOOST_MULT = 1.9;
+const BOOST_DRAIN_PER_SEC = 28; // % / 秒
+const PICKUP_GAIN = 26;
+const MIN_ALT = 0.8;
+const MAX_ALT = 14;
+const DRONE_RADIUS = 0.95;
+const KNOCKBACK_SPEED = 9.5;
+
+function showMessage(text, ms = 1400) {
+  const el = document.getElementById("center-msg");
+  el.textContent = text;
+  el.classList.add("show");
+  clearTimeout(showMessage._t);
+  showMessage._t = setTimeout(() => el.classList.remove("show"), ms);
+}
+
+/* ---------- 虚拟摇杆 ---------- */
+function makeStick(zoneId, knobId) {
+  const zone = document.getElementById(zoneId);
+  const knob = document.getElementById(knobId);
+  const value = { x: 0, y: 0 };
+  let activePointerId = null;
+
+  function setKnob(dx, dy) {
+    knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+  }
+  function reset() {
+    if (activePointerId !== null && zone.hasPointerCapture(activePointerId)) zone.releasePointerCapture(activePointerId);
+    activePointerId = null;
+    value.x = 0; value.y = 0;
+    setKnob(0, 0);
+  }
+  function update(clientX, clientY) {
+    const rect = zone.getBoundingClientRect();
+    const radius = Math.max(20, rect.width / 2 - knob.offsetWidth / 2);
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    let dx = clientX - cx;
+    let dy = clientY - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist > radius) {
+      dx = (dx / dist) * radius;
+      dy = (dy / dist) * radius;
+    }
+    setKnob(dx, dy);
+    const amount = Math.min(1, Math.hypot(dx, dy) / radius);
+    const adjusted = amount < 0.09 ? 0 : (amount - 0.09) / 0.91;
+    value.x = amount ? dx / radius / amount * adjusted : 0;
+    value.y = amount ? -dy / radius / amount * adjusted : 0;
+  }
+
+  zone.addEventListener("pointerdown", (e) => {
+    if (activePointerId !== null || !state.started || state.paused) return;
+    e.preventDefault();
+    activePointerId = e.pointerId;
+    zone.setPointerCapture(e.pointerId);
+    update(e.clientX, e.clientY);
+  });
+  zone.addEventListener("pointermove", (e) => {
+    if (e.pointerId !== activePointerId) return;
+    update(e.clientX, e.clientY);
+  });
+  function endTouch(e) {
+    if (e.pointerId !== activePointerId) return;
+    activePointerId = null;
+    reset();
+  }
+  zone.addEventListener("pointerup", endTouch);
+  zone.addEventListener("pointercancel", endTouch);
+  zone.addEventListener("lostpointercapture", reset);
+  value.reset = reset;
+
+  return value;
+}
+
+const leftStick = makeStick("stick-left", "knob-left");   // 油门 + 偏航
+const rightStick = makeStick("stick-right", "knob-right"); // 俯仰 + 横滚
+
+/* 加速键 */
+const boostBtn = document.getElementById("boost-btn");
+function setBoost(on) {
+  state.boosting = on && state.battery > 0.5 && state.started && !state.matchOver && !state.paused;
+  boostBtn.classList.toggle("active", state.boosting);
+}
+boostBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); boostBtn.setPointerCapture(e.pointerId); setBoost(true); });
+boostBtn.addEventListener("pointerup", () => setBoost(false));
+boostBtn.addEventListener("pointercancel", () => setBoost(false));
+boostBtn.addEventListener("lostpointercapture", () => setBoost(false));
+
+/* ---------- 键盘操控：侦测到没有触控（电脑）时可用 WASD + 方向键 + Q 加速 ---------- */
+const keys = {};
+window.addEventListener("keydown", (e) => {
+  if (["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName)) return;
+  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
+  if (e.key === "Escape" && !e.repeat) { togglePause(); return; }
+  keys[e.key.toLowerCase()] = true;
+  if (e.key.toLowerCase() === "q") setBoost(true);
+  if (e.key.toLowerCase() === "v" && !e.repeat) fpvBtn.click();
+  if (e.key.toLowerCase() === "f" && !e.repeat) fullscreenBtn.click();
+});
+window.addEventListener("keyup", (e) => {
+  keys[e.key.toLowerCase()] = false;
+  if (e.key.toLowerCase() === "q") setBoost(false);
+});
+function keyboardLeftStick() {
+  return { x: (keys["d"] ? 1 : 0) - (keys["a"] ? 1 : 0), y: (keys["w"] ? 1 : 0) - (keys["s"] ? 1 : 0) };
+}
+function keyboardRightStick() {
+  return {
+    x: (keys["arrowright"] ? 1 : 0) - (keys["arrowleft"] ? 1 : 0),
+    y: (keys["arrowup"] ? 1 : 0) - (keys["arrowdown"] ? 1 : 0),
+  };
+}
+
+/* ---------- 飞行物理（Mode 2：左=油门+偏航，右=俯仰+横滚） ---------- */
+function stepDrone(d, input, dt, speedMult) {
+  // 偏航
+  d.heading += input.yaw * MAX_YAW_RATE * dt;
+
+  // 目标垂直速度（定高模式：摇杆回中即悬停）
+  const targetVy = input.throttle * MAX_CLIMB;
+  d.vel.y += (targetVy - d.vel.y) * Math.min(1, dt * 6);
+
+  // 机身朝向向量（heading=0 时面向 -Z）
+  const fwd = new THREE.Vector3(-Math.sin(d.heading), 0, -Math.cos(d.heading));
+  const right = new THREE.Vector3(Math.cos(d.heading), 0, -Math.sin(d.heading));
+
+  const targetForward = input.pitch * MAX_FWD_SPEED * speedMult;
+  const targetLateral = input.roll * MAX_LAT_SPEED * speedMult;
+
+  const targetVx = fwd.x * targetForward + right.x * targetLateral;
+  const targetVz = fwd.z * targetForward + right.z * targetLateral;
+
+  const response = d === state.player ? (Math.abs(input.pitch) + Math.abs(input.roll) < .05 ? 10 : 7) : 5;
+  d.vel.x += (targetVx - d.vel.x) * (1 - Math.exp(-dt * response));
+  d.vel.z += (targetVz - d.vel.z) * (1 - Math.exp(-dt * response));
+
+  d.prevPos.copy(d.pos);
+  d.pos.addScaledVector(d.vel, dt);
+
+  // 场地边界与高度限制
+  d.pos.x = THREE.MathUtils.clamp(d.pos.x, -ARENA + 1.2, ARENA - 1.2);
+  d.pos.z = THREE.MathUtils.clamp(d.pos.z, -ARENA + 1.2, ARENA - 1.2);
+  if (d.pos.y < MIN_ALT) { d.pos.y = MIN_ALT; d.vel.y = Math.max(0, d.vel.y); }
+  if (d.pos.y > MAX_ALT) { d.pos.y = MAX_ALT; d.vel.y = Math.min(0, d.vel.y); }
+
+  // 视觉倾斜：跟随俯仰/横滚输入，回中时自动回平
+  const targetTiltPitch = -input.pitch * 0.32;
+  const targetTiltRoll = -input.roll * 0.28 + input.yaw * 0.18;
+  d.tiltPitch += (targetTiltPitch - d.tiltPitch) * Math.min(1, dt * 6);
+  d.tiltRoll += (targetTiltRoll - d.tiltRoll) * Math.min(1, dt * 6);
+
+  if (d.hitCooldown > 0) d.hitCooldown = Math.max(0, d.hitCooldown - dt);
+}
+
+function applyTransform(mesh, d) {
+  mesh.position.copy(d.pos);
+  mesh.rotation.set(d.tiltPitch, d.heading, d.tiltRoll);
+}
+
+/* ---------- AI：追逐它选定的答案龙门，难度决定「猜得准不准」与「飞得准不准/快不快」 ---------- */
+function pickAiTarget(preset) {
+  if (!quiz.active || quiz.props.length === 0) return null;
+  const correctProp = quiz.props.find(p => p.correct);
+  const wrongProps = quiz.props.filter(p => !p.correct);
+  if (!correctProp || wrongProps.length === 0) return correctProp || quiz.props[0];
+  return Math.random() < preset.guessAccuracy
+    ? correctProp
+    : wrongProps[Math.floor(Math.random() * wrongProps.length)];
+}
+
+function stepAI(ai, index, dt) {
+  const preset = DIFFICULTY_PRESETS[state.difficulty] || DIFFICULTY_PRESETS.normal;
+
+  // 目标龙门被人捷足先登冲掉了（答对清场或被人答错弹开消失），重新选一个——
+  // 瞄准偏差在「选定目标那一刻」就固定下来，不是每帧重算，飞起来才会又快又直、不会画龙
+  if (!ai.targetProp || !quiz.props.includes(ai.targetProp)) {
+    ai.targetProp = quiz.active ? pickAiTarget(preset) : null;
+    ai.targetOffset.set(
+      (Math.random() * 2 - 1) * preset.aimJitter * 0.4,
+      (Math.random() * 2 - 1) * preset.aimJitter * 0.25,
+      (Math.random() * 2 - 1) * preset.aimJitter * 0.4
+    );
+  }
+
+  const targetPos = ai.targetProp
+    ? ai.targetProp.group.position.clone().add(ai.targetOffset)
+    : AI_SPAWNS[index]; // 没题目时飞回自己出生点待命
+
+  const toTarget = targetPos.clone().sub(ai.pos);
+  toTarget.y = 0;
+  const desiredHeading = Math.atan2(-toTarget.x, -toTarget.z);
+  let diff = desiredHeading - ai.heading;
+  diff = Math.atan2(Math.sin(diff), Math.cos(diff)); // 归一化到 -PI..PI
+
+  const closeIn = toTarget.length() < 3;
+  const input = {
+    yaw: THREE.MathUtils.clamp(diff * preset.yawGain, -1, 1),
+    throttle: THREE.MathUtils.clamp((targetPos.y - ai.pos.y) * 0.9, -1, 1),
+    pitch: Math.max(.08, Math.cos(diff)) * (closeIn ? .55 : 1),
+    roll: 0,
+  };
+  stepDrone(ai, input, dt, preset.speedMult);
+}
+
+/* ---------- 碰撞击退：玩家＋3 台 AI 共 4 台，两两互相检测 ---------- */
+function resolveCollision() {
+  if (state.practice || state.difficulty === "easy") return;
+  const combatants = [state.player, ...state.ais];
+  for (let i = 0; i < combatants.length; i++) {
+    for (let j = i + 1; j < combatants.length; j++) {
+      const a = combatants[i], b = combatants[j];
+      if (a.hitCooldown > 0 || b.hitCooldown > 0) continue;
+      const delta = a.pos.clone().sub(b.pos);
+      const dist = delta.length();
+      const minDist = DRONE_RADIUS * 2;
+      if (dist > 0 && dist < minDist) {
+        const dir = delta.normalize();
+        const overlap = minDist - dist;
+        a.pos.addScaledVector(dir, overlap / 2);
+        b.pos.addScaledVector(dir, -overlap / 2);
+
+        a.vel.copy(dir).multiplyScalar(KNOCKBACK_SPEED);
+        a.vel.y += 1.2;
+        b.vel.copy(dir).multiplyScalar(-KNOCKBACK_SPEED);
+        b.vel.y += 1.2;
+
+        a.hitCooldown = 0.5;
+        b.hitCooldown = 0.5;
+        if (a === state.player || b === state.player) {
+          showMessage("相撞！");
+          state.collisions++; state.combo = 0;
+          if (navigator.vibrate) navigator.vibrate(60);
+        }
+      }
+    }
+  }
+}
+
+/* ---------- 电池道具拾取 ---------- */
+function updatePickups(dt, now) {
+  for (const pk of pickups) {
+    if (!pk.active) {
+      if (now >= pk.respawnAt) {
+        pk.mesh.position.copy(randomPickupPos());
+        pk.mesh.visible = true;
+        pk.active = true;
+      }
+      continue;
+    }
+    pk.mesh.rotation.y += dt * 1.4;
+    pk.mesh.position.y += Math.sin(now * 0.002 + pk.mesh.position.x) * 0.002;
+    if (pk.mesh.position.distanceTo(state.player.pos) < 1.3) {
+      pk.active = false;
+      pk.mesh.visible = false;
+      pk.respawnAt = now + 3000;
+      state.battery = Math.min(100, state.battery + PICKUP_GAIN);
+      if (state.mode === "quiz" && quiz.phase === "think") {
+        state.scores.player++;
+        showMessage("思考飞行积分 +1 · 电池 +" + PICKUP_GAIN + "%", 900);
+      } else showMessage("电池 +" + PICKUP_GAIN + "%", 900);
+      if (navigator.vibrate) navigator.vibrate(25);
+    }
+  }
+}
+
+/* ---------- 电池 UI ---------- */
+const batteryFill = document.getElementById("battery-fill");
+const batteryLabel = document.getElementById("battery-label");
+function updateBatteryUI() {
+  const pct = Math.round(state.battery);
+  batteryFill.style.width = pct + "%";
+  batteryFill.classList.toggle("low", pct < 20);
+  batteryLabel.textContent = pct + "%";
+  document.getElementById("boost-energy").textContent = pct > 0 ? pct + "%" : "恢复中";
+  boostBtn.classList.toggle("empty", state.battery <= 0.5);
+}
+
+/* ---------- 题库：按 Tahun × 学科筛选。题目是可审核的起始包，不把它冒充成正式 DSKP 题库。 ---------- */
+state.learning = { correct: 0, wrong: 0 };
+
+const SUBJECT_LABELS = { math: "数学", science: "科学", bm: "Bahasa Melayu", bi: "English", bc: "华文", history: "Sejarah" };
+const QUESTION_BANK = [
+  [1,"science","我们用哪个身体部位听声音？","耳朵",["耳朵","眼睛","鼻子","手"]],
+  [1,"bm","Pilih kata yang bermaksud ‘besar’.","besar",["besar","kecil","laju","lambat"]],
+  [1,"bi","Which word names a colour?","blue",["blue","run","book","eat"]],
+  [1,"bc","“大”的反义词是什么？","小",["小","高","多","快"]],
+  [2,"science","植物需要什么来生长？","水",["水","塑料","石头","烟"]],
+  [2,"bm","Pilih kata kerja. (Pilih the action word.)","lari",["lari","meja","merah","besar"]],
+  [2,"bi","Choose the animal.","cat",["cat","chair","yellow","jump"]],
+  [2,"bc","“学校”里的“校”可以组成哪个词？","校长",["校长","木头","朋友","太阳"]],
+  [3,"science","哪一种材料最适合做雨伞来挡雨？","塑料",["塑料","纸","棉花糖","海绵"]],
+  [3,"bm","Pilih penjodoh bilangan yang betul: ___ ekor kucing.","seekor",["seekor","sebiji","sebatang","sekeping"]],
+  [3,"bi","Choose the opposite of ‘hot’.","cold",["cold","tall","fast","loud"]],
+  [3,"bc","“认真”的近义词是什么？","专心",["专心","马虎","安静","快乐"]],
+  [4,"science","水变成水蒸气的过程叫作什么？","蒸发",["蒸发","凝结","融化","结冰"]],
+  [4,"bm","Pilih kata adjektif. (Pilih the describing word.)","cantik",["cantik","makan","sekolah","mereka"]],
+  [4,"bi","Choose the past tense of ‘walk’.","walked",["walked","walking","walks","walker"]],
+  [4,"bc","“一边……一边……”表示什么关系？","同时进行",["同时进行","因果关系","转折关系","选择关系"]],
+  [4,"history","马来西亚国庆日是哪一天？","31 Ogos",["31 Ogos","16 September","1 Januari","25 Disember"]],
+  [5,"science","哪个器官把血液泵送到全身？","心脏",["心脏","胃","肺","皮肤"]],
+  [5,"bm","Pilih kata hubung yang sesuai: Ali membaca ___ Siti menulis.","manakala",["manakala","tetapi","kerana","atau"]],
+  [5,"bi","Choose the synonym of ‘happy’.","glad",["glad","angry","tired","empty"]],
+  [5,"bc","“因为下雨，所以比赛取消。”这句话的关联词表示什么？","因果",["因果","转折","递进","假设"]],
+  [5,"history","马来西亚由多少个州组成？","13",["13","10","14","16"]],
+  [6,"science","食物链中的生产者通常是什么？","绿色植物",["绿色植物","老虎","蘑菇","人类"]],
+  [6,"bm","Pilih ayat yang menggunakan kata sendi nama dengan betul.","Buku itu di atas meja.",["Buku itu di atas meja.","Buku itu ke meja.","Buku itu daripada meja.","Buku itu pada meja."]],
+  [6,"bi","Choose the correct comparative: A drone is ___ than a bicycle.","faster",["faster","fastest","fast","more fast"]],
+  [6,"bc","“即使下雨，我们也准时出发。”表达什么关系？","假设让步",["假设让步","并列","因果","承接"]],
+  [6,"history","马来西亚日是哪一天？","16 September",["16 September","31 Ogos","1 Mei","5 Jun"]],
+].map(([year, subject, prompt, answer, choices], index) => ({ id: `bank-${index}`, year, subject, prompt, answer, choices }));
+// 同一学科在一局内至少有五道可轮换题；低／高年段分别控管阅读量与概念。
+const EXTRA_QUESTION_BANK = [
+  [[1,2,3],"science","哪一种东西是有生命的？","小鸟",["小鸟","石头","杯子","铅笔"]],
+  [[1,2,3],"science","太阳给我们什么？","光和热",["光和热","冰块","雨伞","书本"]],
+  [[1,2,3],"science","磁铁最容易吸起什么？","铁钉",["铁钉","木块","塑料尺","橡皮"]],
+  [[1,2,3],"science","哪一种习惯能保护牙齿？","早晚刷牙",["早晚刷牙","常吃糖","不喝水","不洗手"]],
+  [[1,2,3],"bm","Pilih kata nama.","buku",["buku","berlari","cantik","cepat"]],
+  [[1,2,3],"bm","Pilih kata yang berlawanan dengan ‘tinggi’.","rendah",["rendah","panjang","besar","cepat"]],
+  [[1,2,3],"bm","Pilih ayat yang betul.","Saya suka membaca.",["Saya suka membaca.","Saya membaca suka.","Suka saya membaca.","Membaca suka saya."]],
+  [[1,2,3],"bm","Pilih kata tanya yang sesuai: ___ nama kamu?","Apa",["Apa","Siapa","Bila","Mengapa"]],
+  [[1,2,3],"bi","Choose the word for a number.","seven",["seven","green","table","swim"]],
+  [[1,2,3],"bi","Choose the correct sentence.","I have a kite.",["I have a kite.","I has a kite.","I having kite.","I kite have."]],
+  [[1,2,3],"bi","What do you use to write?","pencil",["pencil","plate","shoe","window"]],
+  [[1,2,3],"bi","Choose the opposite of ‘big’.","small",["small","long","red","jump"]],
+  [[1,2,3],"bc","“明天”的反义词是什么？","昨天",["昨天","今天","早上","晚上"]],
+  [[1,2,3],"bc","哪个词是表示动作的？","跑步",["跑步","苹果","美丽","天空"]],
+  [[1,2,3],"bc","“我在图书馆看书。”句子里地点是哪里？","图书馆",["图书馆","我","看书","书"]],
+  [[1,2,3],"bc","“小明很高兴。”哪一个词形容心情？","高兴",["高兴","小明","很","的"]],
+  [[4,5,6],"science","植物进行光合作用主要需要什么？","阳光",["阳光","金属","塑料","沙子"]],
+  [[4,5,6],"science","电路要让灯泡发亮，必须是什么状态？","闭合",["闭合","断开","潮湿","很长"]],
+  [[4,5,6],"science","月亮本身会发光吗？","不会",["不会","会","只在晚上会","只在雨天会"]],
+  [[4,5,6],"science","减少空气污染的做法是什么？","多乘公共交通",["多乘公共交通","露天焚烧","浪费电","乱丢垃圾"]],
+  [[4,5,6],"bm","Pilih peribahasa yang bermaksud rajin berusaha.","bagai lebah mengumpul madu",["bagai lebah mengumpul madu","bagai aur dengan tebing","bagai pinang dibelah dua","bagai kacang lupakan kulit"]],
+  [[4,5,6],"bm","Pilih kata kerja transitif.","menulis surat",["menulis surat","tidur lena","sangat cantik","di sekolah"]],
+  [[4,5,6],"bm","Pilih ayat aktif.","Aina membaca buku itu.",["Aina membaca buku itu.","Buku itu dibaca oleh Aina.","Buku itu cantik.","Di atas meja buku itu."]],
+  [[4,5,6],"bm","Pilih penanda wacana untuk menunjukkan sebab.","kerana",["kerana","kemudian","walau bagaimanapun","akhirnya"]],
+  [[4,5,6],"bi","Choose the correct future tense.","They will visit us tomorrow.",["They will visit us tomorrow.","They visited us tomorrow.","They visits us tomorrow.","They visiting us tomorrow."]],
+  [[4,5,6],"bi","Choose the antonym of ‘ancient’.","modern",["modern","old","historic","traditional"]],
+  [[4,5,6],"bi","Which sentence uses an adverb?","The drone flew quickly.",["The drone flew quickly.","The quick drone.","A drone is quick.","The drone and kite."]],
+  [[4,5,6],"bi","Choose the correct plural form.","children",["children","childs","childes","child"]],
+  [[4,5,6],"bc","“虽然很累，但是他坚持完成任务。”关联词表示什么？","转折",["转折","因果","条件","递进"]],
+  [[4,5,6],"bc","哪一句有比喻修辞？","云朵像棉花糖。",["云朵像棉花糖。","云朵在天空。","我看见云朵。","今天有云。"]],
+  [[4,5,6],"bc","“井然有序”最接近哪个意思？","整齐有条理",["整齐有条理","非常安静","速度很快","颜色鲜艳"]],
+  [[4,5,6],"bc","“先……再……”表示什么顺序？","先后顺序",["先后顺序","因果关系","选择关系","转折关系"]],
+  [[4,5,6],"history","马来西亚的国家原则共有几项？","5",["5","3","6","10"]],
+  [[4,5,6],"history","马来西亚的首都是哪里？","Kuala Lumpur",["Kuala Lumpur","Johor Bahru","Kuching","Kota Kinabalu"]],
+  [[4,5,6],"history","Jalur Gemilang 是什么？","马来西亚国旗",["马来西亚国旗","国歌","货币","地图"]],
+  [[4,5,6],"history","马来西亚日纪念什么？","马来西亚成立",["马来西亚成立","学校假期","丰收节","新年"]],
+].map(([years, subject, prompt, answer, choices], index) => ({ id: `extra-${index}`, years, subject, prompt, answer, choices }));
+
+let questionDeck = [];
+let usedQuestionIds = new Set();
+let generatedQuestionId = 0;
+function shuffle(items) {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [copy[i], copy[j]] = [copy[j], copy[i]]; }
+  return copy;
+}
+function makeMathQuestion(year) {
+  const integer = n => Math.floor(Math.random() * n);
+  let prompt, answer, distractors;
+  if (year <= 1) { const a=integer(10)+1,b=integer(10)+1; answer=a+b; prompt=`${a} + ${b} = ?`; distractors=[answer-1,answer+1,answer+2]; }
+  else if (year === 2) { const a=11+integer(30),b=1+integer(a-1); answer=a-b; prompt=`${a} − ${b} = ?`; distractors=[answer-1,answer+1,answer+2]; }
+  else if (year === 3) { const a=2+integer(8),b=2+integer(8); answer=a*b; prompt=`${a} × ${b} = ?`; distractors=[answer-a,answer+b,answer+2]; }
+  else if (year === 4) { const a=10+integer(40),b=10+integer(40); answer=a+b; prompt=`${a} + ${b} = ?`; distractors=[answer-10,answer+10,answer+1]; }
+  else if (year === 5) { const a=2+integer(8),b=10+integer(8)*10; answer=a*b; prompt=`${a} × ${b} = ?`; distractors=[answer-b,answer+b,answer+10]; }
+  else { const a=120+integer(180),b=20+integer(80); answer=a+b; prompt=`${a} + ${b} = ?`; distractors=[answer-10,answer+10,answer+1]; }
+  const choices = shuffle([...new Set([answer,...distractors].map(String))]).slice(0,4);
+  while (choices.length < 4) choices.push(String(answer + choices.length + 3));
+  return { id:`math-${year}-${++generatedQuestionId}`, year, subject:"math", prompt, answer:String(answer), choices:shuffle(choices) };
+}
+function refillQuestionDeck() {
+  const subject = state.subject;
+  const eligible = QUESTION_BANK.concat(EXTRA_QUESTION_BANK).filter(q => (q.year === state.year || q.years?.includes(state.year)) && (subject === "mixed" || q.subject === subject));
+  questionDeck = shuffle(eligible.filter(q => !usedQuestionIds.has(q.id)));
+  if (!questionDeck.length) { usedQuestionIds = new Set(); questionDeck = shuffle(eligible); }
+}
+function nextQuestion() {
+  if (state.subject === "math") return makeMathQuestion(state.year);
+  if (!questionDeck.length) refillQuestionDeck();
+  // 综合模式必定混入同年级的即时数学题，避免只背固定题库。
+  if (state.subject === "mixed" && Math.random() < .3) return makeMathQuestion(state.year);
+  const source = questionDeck.shift() || makeMathQuestion(state.year);
+  usedQuestionIds.add(source.id);
+  return { ...source, choices: shuffle(source.choices.map(String)), answer: String(source.answer) };
+}
+
+function makeLabelSprite(text) {
+  const c = document.createElement("canvas");
+  c.width = 256; c.height = 256;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath(); ctx.arc(128, 128, 116, 0, Math.PI * 2); ctx.fill();
+  ctx.lineWidth = 10; ctx.strokeStyle = "#d7ac50"; ctx.stroke();
+  ctx.fillStyle = "#0b1620";
+  ctx.font = `bold ${text.length > 2 ? 70 : 100}px 'PingFang SC','Microsoft YaHei',sans-serif`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(text, 128, 142);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+  sprite.scale.set(2.2, 2.2, 1);
+  return sprite;
+}
+
+const THINK_SECONDS = 7;
+const quiz = { active: false, props: [], nextAt: 0, question: null, age: 0, phase: "idle" };
+window.__debugQuiz = quiz;
+const quizBanner = document.getElementById("quiz-banner");
+const answerRadar = document.getElementById("answer-radar");
+function renderQuestion() {
+  const q = quiz.question;
+  const thinking = quiz.phase === "think";
+  quizBanner.replaceChildren();
+  const meta = document.createElement("div"); meta.className = "question-meta";
+  meta.textContent = `${SUBJECT_LABELS[q.subject]} · Tahun ${state.year}`;
+  const title = document.createElement("div"); title.className = "question-text"; title.textContent = q.prompt;
+  const phase = document.createElement("div"); phase.className = "question-phase";
+  phase.textContent = thinking ? "先想一想，也可以自由飞行" : "选好答案，跟着对应字母的箭头飞";
+  quizBanner.append(meta,title,phase);
+  if (thinking) {
+    const timer = document.createElement("span"); timer.id="think-countdown"; timer.textContent=`${THINK_SECONDS} 秒`; phase.append(timer);
+    const progress=document.createElement("progress"); progress.id="think-progress"; progress.max=THINK_SECONDS; progress.value=THINK_SECONDS; quizBanner.append(progress);
+  } else {
+    const options=document.createElement("div"); options.id="answer-options";
+    q.choices.forEach((text,i)=> { const item=document.createElement("span"); item.textContent=`${"ABCD"[i]} · ${text}`; options.append(item); });
+    quizBanner.append(options);
+  }
+}
+function updateAnswerPointers() {
+  answerRadar.hidden = quiz.phase !== "answer" || state.matchOver || state.practice;
+  if (answerRadar.hidden) return;
+  const cx=innerWidth/2, cy=innerHeight*.55;
+  const rx=Math.max(60,cx-42), ry=Math.max(35,innerHeight*.22);
+  quiz.props.forEach(p=> {
+    const delta=p.group.position.clone().sub(state.player.pos);
+    const relative=Math.atan2(delta.x,-delta.z)+state.player.heading;
+    // Compass arrows rotate with the player's heading, including rings behind them.
+    const sx=Math.sin(relative), sy=-Math.cos(relative);
+    p.pointer.style.left=`${cx+sx*rx}px`;
+    p.pointer.style.top=`${cy+sy*ry}px`;
+    p.pointer.querySelector('.pointer-arrow').style.transform=`rotate(${relative}rad)`;
+  });
+}
+
+function spawnQuestion() {
+  const q = nextQuestion();
+  q.correct = q.choices.indexOf(q.answer);
+  quiz.question = q;
+  quiz.active = true;
+  quiz.props = [];
+  quiz.age = 0;
+  quiz.phase = "think";
+  renderQuestion();
+  quizBanner.hidden = false;
+  answerRadar.hidden = true;
+}
+
+function directionName(delta) {
+  const names = ["北", "东北", "东", "东南", "南", "西南", "西", "西北"];
+  return names[(Math.round(Math.atan2(delta.x, -delta.z) / (Math.PI / 4)) + 8) % 8];
+}
+function revealAnswerRings() {
+  const q = quiz.question;
+  if (!q || quiz.phase !== "think") return;
+  // 每次重洗选项与方位；不是横排，也不从玩家正前方依序摆开。
+  const origin = state.player.pos.clone();
+  const scale = MAP_SCALES[state.mapSize];
+  const angles = shuffle([0, 1, 2, 3].slice(0, q.choices.length)).map((slot, i) => slot * Math.PI / 2 + Math.random() * .56 - .28);
+  q.choices.forEach((text, i) => {
+    const isCorrect = text === q.answer;
+    const group = buildAnswerRing();
+    const distance = (15 + Math.random() * 8) * scale;
+    const angle = angles[i];
+    const pos = origin.clone().add(new THREE.Vector3(Math.sin(angle) * distance, 0, -Math.cos(angle) * distance));
+    pos.x = THREE.MathUtils.clamp(pos.x, -ARENA + 6, ARENA - 6);
+    pos.z = THREE.MathUtils.clamp(pos.z, -ARENA + 6, ARENA - 6);
+    pos.y = GOAL_Y;
+    group.position.copy(pos);
+    orientGate(group, pos.clone().sub(origin));
+
+    const letter = "ABCD"[i];
+    const label = makeLabelSprite(letter);
+    label.position.set(0, 4.0, 0);
+    group.add(label);
+
+    scene.add(group);
+    group.updateMatrixWorld(true);
+    const pointer=document.createElement("div"); pointer.className="answer-pointer";
+    pointer.innerHTML=`<span class="pointer-arrow">↑</span><span class="pointer-letter">${letter}</span>`;
+    pointer.setAttribute("aria-label",`${letter}：${text}`); answerRadar.append(pointer);
+    quiz.props.push({ group, correct: isCorrect, text, letter, pointer });
+  });
+  quiz.phase = "answer";
+  quiz.age = 0;
+  renderQuestion();
+  answerRadar.hidden = false;
+}
+
+function clearQuestionRound(delay) {
+  quiz.props.forEach(p => disposeGroup(p.group));
+  quiz.props = [];
+  quiz.active = false;
+  quiz.phase = "idle";
+  quiz.nextAt = delay;
+  quizBanner.hidden = true;
+  answerRadar.hidden = true;
+  answerRadar.replaceChildren();
+}
+
+/* ---------- 穿环判定：不分方向，两边穿过都算；龙门位置固定到下一题才换 ---------- */
+function checkGoalCrossing(d, goal) {
+  const before = goal.worldToLocal(d.prevPos.clone());
+  const after = goal.worldToLocal(d.pos.clone());
+  const crossed = (before.x < 0 && after.x >= 0) || (before.x > 0 && after.x <= 0);
+  if (!crossed) return false;
+  const t = -before.x / (after.x - before.x);
+  const distFromCenter = Math.hypot(THREE.MathUtils.lerp(before.y, after.y, t), THREE.MathUtils.lerp(before.z, after.z, t));
+  d.lastPrecision = distFromCenter;
+  return distFromCenter <= GOAL_HOLE_RADIUS;
+}
+
+function updateQuestionRound(dt) {
+  if (!quiz.active) {
+    quiz.nextAt -= dt;
+    if (quiz.nextAt <= 0) spawnQuestion();
+    return;
+  }
+  quiz.age += dt;
+  if (quiz.phase === "think") {
+    document.getElementById("think-countdown").textContent=`${Math.ceil(Math.max(0,THINK_SECONDS-quiz.age))} 秒`;
+    document.getElementById("think-progress").value=Math.max(0,THINK_SECONDS-quiz.age);
+    if (quiz.age >= THINK_SECONDS) revealAnswerRings();
+    return;
+  }
+
+  const combatants = [{ d: state.player, isPlayer: true, label: "玩家" }]
+    .concat(state.ais.map((d, i) => ({ d, isPlayer: false, label: AI_NAMES[i], idx: i })));
+
+  for (const c of combatants) {
+    if (!c.isPlayer && quiz.age < DIFFICULTY_PRESETS[state.difficulty].grace) continue;
+    if (c.d.hitCooldown > 0) continue;
+    for (let i = 0; i < quiz.props.length; i++) {
+      const p = quiz.props[i];
+      if (!checkGoalCrossing(c.d, p.group)) continue;
+
+      if (p.correct) {
+        if (c.isPlayer) { state.scores.player++; state.learning.correct++; state.combo++; state.bestCombo = Math.max(state.bestCombo, state.combo); chime(true); state.battery = Math.min(100, state.battery + 15); }
+        else state.scores.ai[c.idx]++;
+        showMessage(c.isPlayer ? `答对了！${quiz.question.prompt.replace("?", p.text)}${state.combo > 1 ? " · 连对 " + state.combo : ""}` : `${c.label} 先到了 · ${quiz.question.prompt.replace("?", p.text)}`, 1800);
+        if (c.isPlayer && navigator.vibrate) navigator.vibrate([40, 60, 40]);
+        clearQuestionRound(2.2);
+      } else {
+        if (c.isPlayer) {
+          state.learning.wrong++;
+          state.combo = 0;
+          showMessage("再想一想，试试另一个环", 1400);
+          chime(false);
+          if (navigator.vibrate) navigator.vibrate(50);
+        }
+        const dir = c.d.pos.clone().sub(p.group.position);
+        if (dir.lengthSq() < 1e-4) dir.set(1, 0, 0); else dir.normalize();
+        c.d.vel.copy(dir).multiplyScalar(KNOCKBACK_SPEED * 0.8);
+        c.d.vel.y += 1;
+        c.d.hitCooldown = 0.5;
+        disposeGroup(p.group);
+        p.pointer.remove();
+        quiz.props.splice(i, 1); // 只移除答错的那一个，正确答案留在场上让大家继续找
+      }
+      break;
+    }
+    if (!quiz.active) break; // 已经有人答对、整题结束，这一帧不用再检查其他人
+  }
+}
+
+function resetAllPositions() {
+  [state.player,...state.ais].forEach(d=>{d.hitCooldown=0;d.tiltPitch=0;d.tiltRoll=0;});
+  state.player.pos.copy(PLAYER_SPAWN);
+  state.player.prevPos.copy(PLAYER_SPAWN);
+  state.player.vel.set(0, 0, 0);
+  state.player.heading = PLAYER_HEADING;
+  state.ais.forEach((ai, i) => {
+    ai.pos.copy(AI_SPAWNS[i]);
+    ai.prevPos.copy(AI_SPAWNS[i]);
+    ai.vel.set(0, 0, 0);
+    ai.heading = AI_HEADINGS[i];
+    ai.targetProp = null;
+  });
+}
+
+/* ---------- 比分／倒计时 UI 与比赛结束 ---------- */
+const scorePlayerEl = document.getElementById("score-player");
+const scoreAiEls = [0, 1, 2].map(i => document.getElementById("score-ai-" + i));
+const matchTimerEl = document.getElementById("match-timer");
+const endScreen = document.getElementById("end-screen");
+const endTitle = document.getElementById("end-title");
+const endScore = document.getElementById("end-score");
+
+function formatTime(sec) {
+  sec = Math.max(0, Math.ceil(sec));
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m + ":" + String(s).padStart(2, "0");
+}
+
+function updateMatchUI() {
+  scorePlayerEl.textContent = state.scores.player;
+  state.scores.ai.forEach((v, i) => { scoreAiEls[i].textContent = v; });
+  matchTimerEl.textContent = state.practice ? "不限时" : formatTime(state.matchTime);
+}
+
+function endMatch() {
+  state.matchOver = true;
+  setBoost(false);
+  if(engine) engine.master.gain.setTargetAtTime(0,audioCtx.currentTime,.04);
+  document.getElementById("restart-btn").textContent = state.practice ? (preferences.onboardingComplete ? "去轻松飞 →" : "进入飞学竞场 →") : "再来一局";
+  const results = [
+    { label: "玩家", score: state.scores.player },
+    ...AI_NAMES.map((label, i) => ({ label, score: state.scores.ai[i] })),
+  ].sort((a, b) => b.score - a.score);
+  const playerRank = 1 + results.filter(r => r.score > state.scores.player).length;
+  const tied = results.filter(r => r.score === state.scores.player).length > 1;
+  endTitle.textContent = state.practice ? "完成飞行试炼！" : state.scores.player === 0 ? "每次起飞，都是进步" : playerRank === 1 ? (tied ? "并列第一，一起冲线！" : "漂亮！你飞在最前面") : `第 ${playerRank} 名 · 再飞一次？`;
+  endScore.innerHTML = state.practice ? "5 个环 · 已掌握起飞与转向" : results.map((r, i) => `<div class="result-row ${r.label === "玩家" ? "you" : ""}"><span>${1 + results.filter(x => x.score > r.score).length}　${r.label === "玩家" ? "你" : r.label}</span><span>${r.score} ${state.mode === "race" ? "环" : "分"}</span></div>`).join("");
+  const key = `${state.mode}:${state.difficulty}:${state.control}`;
+  const previous = preferences.best[key] || 0;
+  if (!state.practice) preferences.best[key] = Math.max(previous, state.scores.player);
+  savePreferences();
+  document.getElementById("end-detail").textContent = state.practice ? (preferences.onboardingComplete ? "准备好了！试试轻松飞，和三位飞手同场竞速。" : "飞行执照已解锁。接下来选择年级、学科与地图，开始你的飞学挑战。") : state.mode === "race" ? `穿过 ${state.gates} 环 · 精准穿环 ${state.clean} 次 · 最长连续 ${state.bestCombo} 环。${state.scores.player > previous ? "创下本机个人最佳！" : `本机最佳 ${preferences.best[key]} 环。`} ${state.gates === 0 ? "可以先试飞，松手就能稳稳停住。" : "下次试试：直线加速，入弯松手。"}` : `答对 ${state.learning.correct} 题 · 思考飞行积分 ${state.scores.player - state.learning.correct} 分 · 重新尝试 ${state.learning.wrong} 次 · 最长连对 ${state.bestCombo} 题。`;
+  releaseControls();
+  chime(true);
+  endScreen.hidden = false;
+}
+
+document.getElementById("restart-btn").addEventListener("click", () => {
+  if (state.practice && !preferences.onboardingComplete) { preferences.onboardingComplete = true; savePreferences(); return returnToMenu(); }
+  if (state.practice) { state.mode = "race"; startGame("easy", false); }
+  else startGame(state.difficulty, false);
+});
+
+/* ---------- 相机：第三人称跟随 / 第一人称 FPV ---------- */
+state.viewMode = "chase"; // "chase" | "fpv"
+const camOffset = new THREE.Vector3(0, 3.0, 7.2);
+const camLookOffset = new THREE.Vector3(0, 0.6, 0);
+
+function updateCamera(dt) {
+  if (!state.started) {
+    camera.position.lerp(new THREE.Vector3(28, 13, 38), 1-Math.exp(-dt*2));
+    camera.lookAt(0, 2.5, 0); return;
+  }
+  const p = state.player;
+  const fwd = new THREE.Vector3(-Math.sin(p.heading), 0, -Math.cos(p.heading));
+
+  if (state.viewMode === "fpv") {
+    const nose = p.pos.clone().addScaledVector(fwd, 0.55).add(new THREE.Vector3(0, 0.22, 0));
+    camera.position.lerp(nose, Math.min(1, dt * 20));
+    camera.lookAt(nose.clone().addScaledVector(fwd, 12));
+  } else {
+    const desired = p.pos.clone()
+      .addScaledVector(fwd, -camOffset.z)
+      .add(new THREE.Vector3(0, camOffset.y, 0));
+    camera.position.lerp(desired, Math.min(1, dt * 5.5));
+    const lookAt = p.pos.clone().addScaledVector(fwd, 7).add(camLookOffset);
+    camera.lookAt(lookAt);
+  }
+}
+
+const fpvBtn = document.getElementById("fpv-btn");
+fpvBtn.addEventListener("click", () => {
+  state.viewMode = state.viewMode === "chase" ? "fpv" : "chase";
+  playerDrone.visible = state.viewMode !== "fpv";
+  fpvBtn.classList.toggle("active", state.viewMode === "fpv");
+  showMessage(state.viewMode === "fpv" ? "第一人称视角" : "第三人称跟随", 1100);
+});
+
+const fullscreenBtn = document.getElementById("fullscreen-btn");
+fullscreenBtn.addEventListener("click", () => {
+  if (!document.fullscreenElement) {
+    const req = document.documentElement.requestFullscreen;
+    if (req) {
+      document.documentElement.requestFullscreen().then(() => {
+        fullscreenBtn.classList.add("active");
+      }).catch(() => {
+        showMessage("这个浏览器不支持自动全屏，可用「分享→添加到主屏幕」获得全屏体验", 2800);
+      });
+    } else {
+      showMessage("这个浏览器不支持自动全屏，可用「分享→添加到主屏幕」获得全屏体验", 2800);
+    }
+  } else {
+    document.exitFullscreen();
+    fullscreenBtn.classList.remove("active");
+  }
+});
+
+/* ---------- 飞行场：练习、独立赛道进度与生命周期 ---------- */
+const preferences = { best: {}, control: "assist", sound: true, onboardingComplete: false };
+try {
+  const saved = JSON.parse(localStorage.getItem("drone-club-v2") || "null");
+  if (saved && typeof saved === "object") {
+    if (saved.best && typeof saved.best === "object") for (const [k,v] of Object.entries(saved.best)) if (Number.isFinite(v) && v >= 0) preferences.best[k] = v;
+    preferences.control = saved.control === "pro" ? "pro" : "assist";
+    preferences.sound = saved.sound !== false;
+    preferences.onboardingComplete = saved.onboardingComplete === true;
+  }
+} catch (_) { /* 私密浏览或储存被禁用时，仍可完整游玩。 */ }
+function savePreferences() {
+  preferences.control = state.control; preferences.sound = soundEnabled;
+  try { localStorage.setItem("drone-club-v2", JSON.stringify(preferences)); } catch (_) {}
+}
+state.control = preferences.control;
+soundEnabled = preferences.sound;
+document.getElementById("control-select").value = state.control;
+soundBtn.classList.toggle("active", soundEnabled);
+soundBtn.textContent = soundEnabled ? "声音" : "静音";
+document.getElementById("menu-sound").textContent = soundEnabled ? "声音 开" : "声音 关";
+document.getElementById("control-select").addEventListener("change", e => { state.control = e.target.value; savePreferences(); });
+document.querySelectorAll(".mode-btn").forEach(btn => btn.addEventListener("click", () => {
+  state.mode = btn.dataset.mode;
+  document.querySelectorAll(".mode-btn").forEach(b => { b.classList.toggle("active", b === btn); b.setAttribute("aria-pressed", String(b === btn)); });
+  document.getElementById("best-note").textContent = state.mode === "race" ? "一场 90 秒 · 无淘汰 · 随时暂停" : "先思考再出答案环 · 无正确目标导航";
+}));
+function updateSubjectAvailability() {
+  const history = document.querySelector('#subject-select option[value="history"]');
+  history.disabled = state.year < 4;
+  history.textContent = state.year < 4 ? "Sejarah（Tahun 4 起）" : "Sejarah";
+  if (state.year < 4 && state.subject === "history") { state.subject = "mixed"; document.getElementById("subject-select").value = "mixed"; }
+}
+document.getElementById("year-select").addEventListener("change", e => { state.year = Number(e.target.value); updateSubjectAvailability(); questionDeck = []; usedQuestionIds.clear(); });
+document.getElementById("subject-select").addEventListener("change", e => { state.subject = e.target.value; questionDeck = []; usedQuestionIds.clear(); });
+document.getElementById("map-select").addEventListener("change", e => { state.mapSize = e.target.value; });
+updateSubjectAvailability();
+document.getElementById("practice-btn").addEventListener("click", () => startGame("easy", true));
+document.getElementById("align-btn").addEventListener("click", () => {
+  if(!state.started || state.paused || state.matchOver)return;
+  const target=currentTarget(); if(!target)return;
+  const delta=target.position.clone().sub(state.player.pos);
+  state.player.heading=Math.atan2(-delta.x,-delta.z);
+  state.player.vel.set(0,0,0); releaseControls();
+  showMessage("找到方向了，向前飞！",900);
+});
+
+function chime(success) {
+  if (!audioCtx || !soundEnabled) return;
+  const t = audioCtx.currentTime;
+  (success ? [523.25, 659.25, 783.99] : [330, 261.63]).forEach((hz, i) => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = "sine"; o.frequency.value = hz; o.connect(g); g.connect(audioCtx.destination);
+    g.gain.setValueAtTime(0, t + i * .07); g.gain.linearRampToValueAtTime(.065, t + i * .07 + .015);
+    g.gain.exponentialRampToValueAtTime(.001, t + i * .07 + .22);
+    o.start(t + i * .07); o.stop(t + i * .07 + .24);
+    o.onended = () => { o.disconnect(); g.disconnect(); };
+  });
+}
+function disposeGroup(group) {
+  scene.remove(group);
+  group.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) for (const m of Array.isArray(o.material) ? o.material : [o.material]) { if (m.map) m.map.dispose(); m.dispose(); }
+  });
+}
+function orientGate(group, direction) {
+  const n = direction.clone(); n.y = 0; n.normalize();
+  group.rotation.y = Math.atan2(-n.z, n.x);
+  group.userData.normal = n;
+}
+const course = { gates: [], line: null };
+window.__debugCourse = course;
+function clearCourse() {
+  course.gates.forEach(g => disposeGroup(g)); course.gates = [];
+  if (course.line) { disposeGroup(course.line); course.line = null; }
+}
+function buildCourse() {
+  clearCourse();
+  const scale = MAP_SCALES[state.mapSize];
+  const points = state.practice
+    ? [[0,20], [0,7], [5,-6], [13,-17], [18,-30]].map(([x,z]) => new THREE.Vector3(x, GOAL_Y, z))
+    : Array.from({length:8}, (_, i) => new THREE.Vector3(Math.sin(i * Math.PI / 4) * 19 * scale, GOAL_Y + (state.difficulty === "hard" ? (Math.sin(i * Math.PI / 2)+1) * .8 : 0), Math.cos(i * Math.PI / 4) * 21 * scale));
+  points.forEach((pos, i) => {
+    const gate = buildAnswerRing(pos.y); gate.position.copy(pos);
+    const previous = i === 0 ? new THREE.Vector3(0, GOAL_Y, 32) : points[i - 1];
+    orientGate(gate, pos.clone().sub(previous));
+    const label = makeLabelSprite(String(i + 1)); label.position.y = 4.1; label.scale.set(1.65,1.65,1); gate.add(label);
+    gate.userData.label = label;
+    scene.add(gate); gate.updateMatrixWorld(true); course.gates.push(gate);
+  });
+  const trail = points.map(p => new THREE.Vector3(p.x,.09,p.z));
+  if (!state.practice) trail.push(trail[0].clone());
+  const geo = new THREE.BufferGeometry().setFromPoints(trail);
+  course.line = new THREE.Line(geo, new THREE.LineDashedMaterial({color:0xe5d59d, dashSize:1.1, gapSize:.7, transparent:true, opacity:.5}));
+  course.line.computeLineDistances(); scene.add(course.line);
+  [state.player, ...state.ais].forEach((d,i) => {
+    d.pos.set(i === 0 ? 0 : [-6,6,-10][i-1], GOAL_Y, 32 + (i ? 2 : 0)); d.prevPos.copy(d.pos);
+    d.vel.set(0,0,0); d.heading = 0; d.gateIndex = 0; d.passed = 0; d.hitCooldown = 0; d.approached = false;
+  });
+  highlightCourse();
+}
+function highlightCourse() {
+  course.gates.forEach((g,i) => {
+    const active = i === state.player.gateIndex;
+    g.children[0].material.color.setHex(active ? 0xf2bd48 : 0xc8d3c0);
+    g.children[0].material.emissive.setHex(active ? 0xa47924 : 0x000000);
+    g.children[0].material.emissiveIntensity = active ? .25 : 0;
+    g.userData.label.material.opacity = active ? 1 : .55;
+  });
+}
+function currentTarget() {
+  // 答题竞赛不能将最近答案环当作目标，否则等于替玩家缩小思考范围。
+  if (state.mode === "quiz") return null;
+  if (state.mode === "race" || state.practice) return course.gates[state.player.gateIndex] || null;
+  let best = null, value = Infinity;
+  for (const prop of quiz.props) {
+    const delta = prop.group.position.clone().sub(state.player.pos);
+    const angle = Math.atan2(-delta.x, -delta.z) - state.player.heading;
+    const cost = Math.abs(Math.atan2(Math.sin(angle), Math.cos(angle))) * 25 + delta.length() * .2;
+    if (cost < value) { value = cost; best = prop.group; }
+  }
+  return best;
+}
+function stepRaceAI(ai, index, dt) {
+  const gate = course.gates[ai.gateIndex]; if (!gate) return;
+  const preset = DIFFICULTY_PRESETS[state.difficulty];
+  const n = gate.userData.normal;
+  const relative = ai.pos.clone().sub(gate.position).dot(n);
+  if (relative > .6 && ai.approached) ai.approached = false;
+  if (relative < -2) ai.approached = true;
+  const target = gate.position.clone().addScaledVector(n, ai.approached ? 5 : -6);
+  const to = target.sub(ai.pos);
+  const diff = Math.atan2(Math.sin(Math.atan2(-to.x,-to.z)-ai.heading), Math.cos(Math.atan2(-to.x,-to.z)-ai.heading));
+  stepDrone(ai, {yaw:THREE.MathUtils.clamp(diff * preset.yawGain,-1,1), throttle:THREE.MathUtils.clamp((gate.position.y-ai.pos.y)*.85,-1,1), pitch:Math.max(.08, Math.cos(diff)), roll:0}, dt, preset.speedMult * (1 + index * .025));
+}
+function updateRace() {
+  const all = state.practice ? [state.player] : [state.player,...state.ais];
+  all.forEach((d,i) => {
+    const gate = course.gates[d.gateIndex]; if (!gate || !checkGoalCrossing(d,gate)) return;
+    d.passed++; d.gateIndex = (d.gateIndex + 1) % course.gates.length; d.approached = false;
+    if (i === 0) {
+      state.scores.player++; state.gates++; state.combo++; state.bestCombo = Math.max(state.bestCombo,state.combo);
+      state.battery = Math.min(100,state.battery+12);
+      const precise = d.lastPrecision < .9; if (precise) state.clean++;
+      chime(true); if (navigator.vibrate) navigator.vibrate(15);
+      highlightCourse();
+      const tips = ["试炼 1/5 · 起飞成功！下一个环在前方", "试炼 2/5 · 转弯时左右推摇杆，松手就停", "试炼 3/5 · 很好！直线可以按住右边加速", "试炼 4/5 · 最后一次转向，你快掌握了", "试炼 5/5 · 飞行执照即将解锁"];
+      showMessage(state.practice ? tips[Math.min(state.gates-1,3)] : precise ? "精准穿环 · 能量 +12" : state.gates % 8 === 0 ? "完成一圈！继续逐风" : `穿环 ${state.gates} · 下一环 ${d.gateIndex+1}`, 1150);
+      if (state.practice && state.gates >= 5) endMatch();
+    } else state.scores.ai[i-1]++;
+  });
+  quizBanner.innerHTML = state.practice ? `试飞 ${Math.min(state.gates,5)} / 5<small>跟着金色环 · 松手悬停</small>` : `下一环 ${state.player.gateIndex+1} / ${course.gates.length}<small>${1+state.scores.ai.filter(s=>s>state.scores.player).length} / 4 名 · 已穿 ${state.gates} 环</small>`;
+  quizBanner.hidden = false;
+}
+function releaseControls() {
+  leftStick.reset(); rightStick.reset(); Object.keys(keys).forEach(k=>delete keys[k]); setBoost(false);
+}
+function togglePause(force) {
+  if (!state.started || state.matchOver) return;
+  state.paused = typeof force === "boolean" ? force : !state.paused;
+  if(state.paused && engine) engine.master.gain.setTargetAtTime(0,audioCtx.currentTime,.04);
+  releaseControls(); document.getElementById("pause-screen").hidden = !state.paused;
+  document.getElementById("pause-help").textContent = state.control === "assist" ? "辅助驾驶：左摇杆前进 / 后退 / 转向，自动保持环的高度。右侧按住加速。电脑用 WASD，Q 加速。" : "专业驾驶：左摇杆升降 / 转向，右摇杆前后 / 横移。电脑 WASD 控制左杆，方向键控制右杆。Q 加速。";
+  if (!state.paused) { last = performance.now(); audioCtx?.resume().catch(()=>{}); document.getElementById("pause-btn").focus(); }
+  else document.getElementById("resume-btn").focus();
+}
+document.getElementById("pause-btn").addEventListener("click",()=>togglePause());
+document.getElementById("resume-btn").addEventListener("click",()=>togglePause(false));
+window.addEventListener("blur",()=>{ releaseControls(); togglePause(true); });
+document.addEventListener("visibilitychange",()=>{ if (document.hidden) { releaseControls(); togglePause(true); } });
+window.addEventListener("resize",releaseControls);
+function returnToMenu() {
+  state.started=false; state.paused=false; state.matchOver=false; releaseControls();
+  if(engine)engine.master.gain.setTargetAtTime(0,audioCtx.currentTime,.04);
+  clearQuestionRound(0); clearCourse();
+  document.body.classList.remove("playing", "practice");
+  document.body.classList.remove("quiz-playing");
+  document.getElementById("pause-screen").hidden=true; endScreen.hidden=true;
+  document.getElementById("start-screen").hidden=false;
+  document.getElementById("center-msg").classList.remove("show");
+  buildCourse(); aiDrones.forEach(m=>m.visible=true); obstacles.forEach(o=>o.mesh.visible=false);
+  document.querySelector('.diff-btn[data-diff="easy"]').focus();
+}
+document.getElementById("menu-btn").addEventListener("click",returnToMenu);
+document.getElementById("pause-menu-btn").addEventListener("click",returnToMenu);
+function startGame(difficulty, practice) {
+  try { initAudio(); audioCtx?.resume().catch(()=>{}); } catch (_) { soundEnabled=false; }
+  releaseControls(); clearQuestionRound(0); clearCourse(); resetAllPositions();
+  questionDeck = []; usedQuestionIds.clear();
+  Object.assign(state, { difficulty, practice, started:true, matchOver:false, paused:false, countdown:3, elapsed:0, battery:100, combo:0, bestCombo:0, clean:0, gates:0, collisions:0, matchTime:MATCH_SECONDS, scores:{player:0,ai:[0,0,0]}, learning:{correct:0,wrong:0} });
+  document.body.classList.toggle("assisted",state.control === "assist"); document.body.classList.add("playing");
+  document.body.classList.toggle("practice",practice);
+  document.body.classList.toggle("quiz-playing",state.mode === "quiz" && !practice);
+  document.querySelector("#stick-left .stick-tag").textContent = state.control === "assist" ? "前进 / 转向" : "升降 / 转向";
+  document.querySelector("#stick-right .stick-tag").textContent = "前进 / 横移";
+  document.getElementById("flight-hint").textContent = state.control === "assist" ? "自动定高 · 松手悬停" : "双摇杆 · 松手悬停";
+  document.getElementById("start-screen").hidden=true; endScreen.hidden=true; document.getElementById("pause-screen").hidden=true;
+  aiDrones.forEach(m=>m.visible=!practice);
+  obstacles.forEach(o=>o.mesh.visible=!practice && difficulty === "hard" && state.mode === "quiz");
+  pickups.forEach(pk=>{pk.active=true;pk.mesh.visible=!practice;pk.mesh.position.copy(randomPickupPos());pk.respawnAt=0;});
+  if (state.mode === "race" || practice) buildCourse(); else spawnQuestion();
+  state.viewMode="chase"; playerDrone.visible=true; fpvBtn.classList.remove("active");
+  camera.position.copy(state.player.pos).add(new THREE.Vector3(0,3.5,8)); updateCamera(1);
+  updateMatchUI(); updateBatteryUI(); last=performance.now(); savePreferences();
+  document.getElementById("pause-btn").focus();
+}
+function flightInput() {
+  const kL=keyboardLeftStick(), kR=keyboardRightStick();
+  const clamp = n=>THREE.MathUtils.clamp(n,-1,1);
+  const target=currentTarget();
+  if(state.control === "assist") return {
+    yaw:-Math.sign(clamp(leftStick.x+kL.x+kR.x)) * Math.pow(Math.abs(clamp(leftStick.x+kL.x+kR.x)),1.45) * .8,
+    pitch:clamp(leftStick.y+kL.y+kR.y), roll:0,
+    throttle:clamp(((state.mode === "quiz" ? GOAL_Y : (target ? target.position.y : GOAL_Y)) - state.player.pos.y) * .85),
+  };
+  return {yaw:-clamp(leftStick.x+kL.x), throttle:clamp(leftStick.y+kL.y), pitch:clamp(rightStick.y+kR.y), roll:clamp(rightStick.x+kR.x)};
+}
+const mapCanvas = document.getElementById("mini-map"), mapCtx=mapCanvas.getContext("2d");
+function updateNavigation() {
+  updateAnswerPointers();
+  const target=currentTarget(), marker=document.getElementById("target-marker");
+  marker.hidden=!target || state.matchOver;
+  if(target) {
+    const projected=target.position.clone().add(new THREE.Vector3(0,5.4,0)).project(camera);
+    const delta=target.position.clone().sub(state.player.pos);
+    const forward=new THREE.Vector3(-Math.sin(state.player.heading),0,-Math.cos(state.player.heading));
+    const behind=delta.dot(forward)<0;
+    let x=(projected.x*.5+.5)*innerWidth, y=(-projected.y*.5+.5)*innerHeight;
+    if(behind) { const side=delta.x*Math.cos(state.player.heading)-delta.z*Math.sin(state.player.heading); x=side>0 ? innerWidth-45 : 45; y=innerHeight*.48; }
+    marker.style.left=THREE.MathUtils.clamp(x,45,innerWidth-45)+"px";
+    marker.style.top=THREE.MathUtils.clamp(y,115,innerHeight-120)+"px";
+    marker.querySelector("b").textContent=behind ? (x>innerWidth/2 ? "→" : "←") : "▽";
+    marker.querySelector("span").textContent=`${behind ? "转向" : "目标"} · ${Math.round(delta.length())}m`;
+  }
+  document.getElementById("speed-value").textContent=Math.round(Math.hypot(state.player.vel.x,state.player.vel.z)*3.6);
+  mapCtx.clearRect(0,0,208,208);
+  const scale=2.45, point=p=>[104+p.x*scale,104+p.z*scale];
+  const gates=course.gates.length ? course.gates : quiz.props.map(p=>p.group);
+  mapCtx.strokeStyle="#b9c5a755"; mapCtx.lineWidth=2; mapCtx.beginPath(); gates.forEach((g,i)=>{const [x,y]=point(g.position);i ? mapCtx.lineTo(x,y) : mapCtx.moveTo(x,y);}); if(course.gates.length&&!state.practice)mapCtx.closePath();mapCtx.stroke();
+  gates.forEach(g=>{const [x,y]=point(g.position);mapCtx.fillStyle=g===target?"#f3ca66":"#c1cfb3";mapCtx.beginPath();mapCtx.arc(x,y,g===target?6:3,0,Math.PI*2);mapCtx.fill();});
+  if(!state.practice)state.ais.forEach((d,i)=>{const [x,y]=point(d.pos);mapCtx.fillStyle="#"+AI_COLORS[i].toString(16);mapCtx.beginPath();mapCtx.arc(x,y,3,0,Math.PI*2);mapCtx.fill();});
+  const [x,y]=point(state.player.pos);mapCtx.save();mapCtx.translate(x,y);mapCtx.rotate(-state.player.heading);mapCtx.fillStyle="#ffffff";mapCtx.beginPath();mapCtx.moveTo(0,-8);mapCtx.lineTo(5,5);mapCtx.lineTo(0,2);mapCtx.lineTo(-5,5);mapCtx.closePath();mapCtx.fill();mapCtx.restore();
+}
+window.__debugGame = { startGame, endMatch, togglePause, checkGoalCrossing, currentTarget, spawnQuestion, revealAnswerRings, returnToMenu, renderer, scene, camera, preferences, flightInput, get performance(){ return renderBudget; } };
+
+/* ---------- 主循环 ---------- */
+// 连续低帧率时先减少后期，再降低渲染分辨率。CSS／触控坐标始终保持原尺寸。
+const renderBudget = { frames:0, seconds:0, fps:60, direct:coarsePointer, dpr:renderer.getPixelRatio() };
+function tuneRendering(rawDt) {
+  if(!state.started || state.paused || state.matchOver || rawDt>.5) return;
+  renderBudget.frames++; renderBudget.seconds+=rawDt;
+  if(renderBudget.seconds<3) return;
+  renderBudget.fps=renderBudget.frames/renderBudget.seconds;
+  if(renderBudget.fps<38) {
+    if(!renderBudget.direct) renderBudget.direct=true;
+    else {
+      const floor=coarsePointer ? .8 : 1;
+      const dpr=Math.max(floor,renderBudget.dpr-.2);
+      if(dpr < renderBudget.dpr) { renderer.setPixelRatio(dpr); composer.setPixelRatio(dpr); renderBudget.dpr=dpr; }
+    }
+  }
+  renderBudget.frames=0; renderBudget.seconds=0;
+}
+let last = performance.now();
+function tick(now) {
+  const rawDt=Math.max(0,(now-last)/1000);
+  const dt = Math.min(0.12, rawDt);
+  last = now;
+  tuneRendering(rawDt);
+
+  let speedMult = 0;
+  let playerInput = { yaw: 0, throttle: 0, pitch: 0, roll: 0 };
+  if (state.started && !state.matchOver && !state.paused && state.countdown > 0) {
+    state.countdown=Math.max(0,state.countdown-dt);
+    showMessage(state.countdown>0 ? `准备起飞 · ${Math.ceil(state.countdown)}` : (state.control === "assist" ? "向上推左杆，飞向金色环" : "推动右杆前进，左杆调整高度"),1200);
+  } else if (state.started && !state.matchOver && !state.paused) {
+    state.elapsed += dt;
+    // 加速消耗电池；电量耗尽自动停止加速
+    speedMult = state.practice || state.difficulty === "easy" ? .78 : 1;
+    if (state.boosting && state.battery > 0) {
+      speedMult *= BOOST_MULT;
+      state.battery = Math.max(0, state.battery - BOOST_DRAIN_PER_SEC * dt);
+      if (state.battery <= 0) setBoost(false);
+    } else state.battery=Math.min(100,state.battery+9*dt);
+
+    // 触控摇杆与键盘同时生效，取两者之和并夹在 -1..1（电脑上没有触控输入时为 0，互不干扰）
+    const steps=Math.max(1,Math.ceil(dt/(1/60))), step=dt/steps;
+    for(let s=0;s<steps;s++) {
+      playerInput=flightInput(); stepDrone(state.player,playerInput,step,speedMult);
+      if(!state.practice)state.ais.forEach((ai,i)=> {
+        if(state.mode === "race") stepRaceAI(ai,i,step);
+        else if(quiz.age>DIFFICULTY_PRESETS[state.difficulty].grace) stepAI(ai,i,step);
+      });
+      resolveCollision();
+      if(!state.practice && state.difficulty === "hard" && state.mode === "quiz") { updateObstacles(state.elapsed); checkObstacleHit(state.player,"player"); state.ais.forEach(ai=>checkObstacleHit(ai,"ai")); }
+      if(state.mode === "race" || state.practice)updateRace(); else updateQuestionRound(step);
+      if(state.matchOver)break;
+    }
+    updatePickups(dt, state.elapsed * 1000);
+    updateBatteryUI();
+
+    if(!state.practice) state.matchTime -= dt;
+    if (state.matchTime <= 0) {
+      state.matchTime = 0;
+      endMatch();
+    }
+    updateMatchUI();
+  }
+  updateEngineSound(playerInput, speedMult);
+
+  applyTransform(playerDrone, state.player);
+  aiDrones.forEach((mesh, i) => applyTransform(mesh, state.ais[i]));
+  playerDrone.userData.rotors.forEach(r => r.rotation.y += dt * (30 + speedMult * 16));
+  aiDrones.forEach(mesh => mesh.userData.rotors.forEach(r => r.rotation.y += dt * 32));
+  const playerDiscOpacity = THREE.MathUtils.clamp((speedMult - 0.9) * 0.5, 0, 0.4);
+  playerDrone.userData.propDiscs.forEach(d => d.material.opacity = playerDiscOpacity);
+  aiDrones.forEach(mesh => mesh.userData.propDiscs.forEach(d => d.material.opacity = 0.09));
+
+  clouds.forEach(c => {
+    c.position.x += c.userData.drift * dt;
+    if (c.position.x > ARENA + 30) c.position.x = -(ARENA + 30);
+  });
+
+  updateCamera(dt);
+  if(state.started) updateNavigation();
+  if(renderBudget.direct) renderer.render(scene,camera); else composer.render();
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+buildCourse(); obstacles.forEach(o=>o.mesh.visible=false);
+document.getElementById("start-screen").classList.remove("loading");
+document.getElementById("load-status").textContent = "飞学竞场已就绪";
+window.__gameReady = true;
+// 首次进入先飞完一段短试炼；完成状态只存在这台装置，之后不会再强迫重做。
+if (!preferences.onboardingComplete) {
+  setTimeout(() => { state.mode = "race"; startGame("easy", true); showMessage("飞行试炼 · 完成 5 个小目标后解锁竞场", 2400); }, 80);
+}
+</script>
+</body>
+</html>
