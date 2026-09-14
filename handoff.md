@@ -1,5 +1,16 @@
 # Handoff — 飞学竞场
 
+## 班级排行榜 · 2026-09-14 下午
+
+老师确认发布并要求加排行榜后，用 EnterPlanMode 走完一轮设计确认（三个决定：限本班接 kelasku 登入、真实姓名、穿环竞速＋答题竞速两张榜）。已实作并部署：
+
+- 网址带 `?code=` 班级代码（或本机记住过）时，进场前弹「选你的名字」（复用 `kongsi-idea` 的 `ClassCode`/`supabaseClient`，跟 `tahun1-bc-bishun` 同一套；查无名单会自动退回手动输入名字），完成后主画面出现「🏆 班级排行榜」按钮。没有 `?code=` 的一般访客完全不受影响，已用 Playwright 实测确认（identity-screen/leaderboard-btn 都保持隐藏，`student` 是 `null`）。
+- 排行榜表 `tahun1to6_drone_scores` + RPC `submit_tahun1to6_drone_score`：`kongsi-idea/supabase/migration-2026-09-14-tahun1to6-drone-scores.sql`——**这份 SQL 还没有人跑，需要 Yong Quan 手动贴到 Supabase Dashboard SQL Editor 执行一次**（这个专案没有 CLI/MCP 写入权限，已用 `which supabase psql` 确认过这台机器上两者都不存在，不是偷懒跳过）。migration 跑之前，排行榜按钮和面板功能都正常显示，只是读/写会因表不存在而静默失败（已用 Playwright 实测确认 404 会被 catch 住，不会白屏或报未捕获错误）。
+- **实测抓到一个真 bug 并已修好**：一开始把排行榜分页按钮的 class 取名 `mode-btn`，结果跟游戏本身「穿环竞速／答题竞速」切换器共用的**全局** `document.querySelectorAll(".mode-btn")` 点击监听器撞在一起——点排行榜分页会把 `state.mode` 设成 `undefined`，导致比赛结算画面读成答题模式的文案。已改名 `.board-tab` 并补对应 CSS 解决，`tests/test_game.py` 新增了这条回归断言（`leaderboard tab click must not touch game mode`）。
+- 本机 `python3 tests/test_game.py` 在这个 Claude Code 沙盒里**持续 timeout**（`Page.wait_for_function` 等不到 `window.__gameReady`），但直接改用 Playwright MCP 交互式浏览器验证（同样是 headless Chromium）反而每次都秒过——用 `git stash` 切回上一版 `aa058c1`（今天稍早已上线、已过老师实测的版本）重跑同一份测试，**同样 timeout**，证明这是这台沙盒本身的环境限制，不是这次改动引入的问题。新增的两段测试代码已写入 `tests/test_game.py`，请在**普通 Terminal**（不是这个沙盒）里跑一次确认。
+- 已用 Playwright 实测：无 code 默认路径干净、`?code=` 未知班级会走手动输入 fallback、选完名字排行榜按钮出现、排行榜面板两个分页能切换且不影响游戏本身的模式、穿环竞速真的跑完一局后结算文案正确显示「环」而不是「分」、手机 390×844 视口下身份卡片与排行榜卡片都没有溢出。**没有测试过**：migration 跑完之后的真实读写往返（因为还没跑）、真实 iPhone Safari。
+- 代码已 commit 并 `vercel deploy --prod`（这个工具没接 GitHub 自动部署，一直都要手动跑这一步）。
+
 ## 收工状态 · 2026-09-14
 
 最新用户已确定 slug 为 `tahun1to6-drone`，并明确授权部署到 Vercel `kongsi-idea` 团队与 Hub 上架。Hub 本地已备妥 `?tool=tahun1to6-drone` 详情深链接和复制分享按钮、待上线登记与跨年级学科筛选。Vercel API DNS 不通，线上发布未完成；源码仍在本目录。旧建议 slug 全被 `tahun1to6-drone` 取代。

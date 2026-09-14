@@ -6,7 +6,7 @@
 
 - 受众是 Tahun 1–6 的一般儿童与玩家，不是 1I 专用教学工具；题库须依年级、学科与单元审核，不套用其他项目的课堂题库或 newtool 规范。
 - 技术栈是单一 `index.html`，通过 jsDelivr 导入 Three.js 0.169.0；不得为了小改动引入 npm、build 工具或外部 3D 素材。
-- `run.sh` 启动静态服务器；局域网 IP 每次都须重新查。未部署、没有 Git 仓库。
+- `run.sh` 启动静态服务器；局域网 IP 每次都须重新查。已部署到 Vercel `kongsi-idea` 团队（`https://tahun1to6-drone.vercel.app`，Hub 已上架），源码另有 GitHub 仓库 `kongsi-idea/tahun1to6-drone`——但**没有走 GitHub 自动部署**（`vercel link` 时连接失败），改代码后要记得手动 `vercel deploy --prod`。
 - `manifest.json` 锁定横屏；`icon.svg` 是当前网页／PWA 图标。未在真实 iOS Safari 验证「添加到主屏幕」图标表现。
 
 ## 当前可试玩版本
@@ -20,6 +20,7 @@
 - 支持桌面 WASD、Q 加速、V 视角、F 全屏、Esc 暂停；手机支持双拇指摇杆加加速。
 - 能量会自然恢复；暂停、切换应用和失焦会冻结比赛与清除输入；最佳成绩只存本机 `localStorage`。
 - 场景是程序化日光竞技场，不含外部模型／贴图：割草草场、看台、围网、远景绿丘、树与标识。手机关闭 bloom，连续低帧率会逐级直出渲染并降低 DPR。
+- **班级排行榜（2026-09-14 新增，选配）**：网址带 `?code=` 班级代码（或本机记住过 kelasku 代码）时，进场前会先弹「选你的名字」（接 `kongsi-idea` 的 `ClassCode`/`supabaseClient`，跟 `tahun1-bc-bishun` 同一套），完成后主画面出现「班级排行榜」按钮，穿环竞速／答题竞速分开两张榜，按当前难度过滤、只在同一个 `play_code` 内比较。数据表 `tahun1to6_drone_scores` + RPC `submit_tahun1to6_drone_score`（`kongsi-idea/supabase/migration-2026-09-14-tahun1to6-drone-scores.sql`）。排行按 `mode + difficulty` 分榜，不分年级/学科——跟本机最佳成绩的 key 保持同一套简化逻辑，是刻意的取舍不是漏做。跟 `liangci_scores`/`bishun_progress` 同一套 RLS 模型：anon key 公开、读取全表开放，没有做防伪签名——教室内激励用途，不是有奖竞赛，接受这个已知取舍。
 
 ## 不能破坏的规则
 
@@ -29,9 +30,10 @@
 4. 辅助驾驶是新手默认值；改动输入须保留松手悬停、暂停释放输入和找环不自动推进。
 5. 真实感不得以提高 bloom、曝光或低端机渲染成本为代价；手机画面先保证读得清、跑得动。
 6. 环的支柱不可挡住圆洞；无人机新增零件必须左右对称。
+7. **没有 `?code=` 班级代码时，游戏必须是纯本机版本**：不得弹身份画面、不得发网络请求、不得依赖 Supabase 是否可用——这是给「一般儿童与玩家」（不只是接了 kelasku 的班级）保留的默认体验，新增功能不能让这条路径变得不一样。
 
 ## 验证与交接
 
 - 运行 `python3 tests/test_game.py`。它要求本机 `http://127.0.0.1:8746/` 已运行，覆盖三种视口、双触点、暂停、穿环、答题、结算、本机储存与重玩。
 - 浏览器临时证据放在 `../playwright-to-delete/drone-upgrade/`。原版 `index.before.html` 是唯一未 Git 化回退参考，在用户决定弃置前不可删除。
-- 当前阶段是等待真机试玩反馈；不要在缺少反馈时继续增加玩法、排行榜、部署或正式题库。
+- 已于 2026-09-14 发布上架并按老师要求加了班级排行榜；题库仍是待审起始包，正式课堂使用前仍需老师核对内容，不要把这点当成已经解决。

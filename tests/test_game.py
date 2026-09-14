@@ -38,6 +38,13 @@ def main():
             page.screenshot(path=str(OUT / f"{name}-menu-final.png"))
             layout = page.evaluate("""() => ({inner:[innerWidth,innerHeight], scroll:[document.documentElement.scrollWidth,document.documentElement.scrollHeight], ready:window.__gameReady})""")
             assert layout["scroll"] == layout["inner"], (name, layout)
+            # No ?code= param: class-leaderboard identity UI must stay fully out of the way.
+            no_code = page.evaluate("""() => ({
+              identityHidden: document.getElementById('identity-screen').hidden,
+              boardBtnHidden: document.getElementById('leaderboard-btn').hidden,
+              student: window.__debugGame.student,
+            })""")
+            assert no_code == {"identityHidden": True, "boardBtnHidden": True, "student": None}, (name, no_code)
             page.locator("#practice-btn").click()
             page.wait_for_function("window.__debugState.started")
             countdown = page.evaluate("() => window.__debugState.countdown")
@@ -159,6 +166,38 @@ def main():
         assert page.evaluate("!__debugState.practice && __debugState.mode === 'race' && __debugState.difficulty === 'easy'")
         print('practice 5 gates/results/next race OK')
         assert not final_errors, final_errors
+        page.close()
+
+        # Class-code leaderboard: identity gate, manual-entry fallback (no roster
+        # match against the real kongsi-idea DB), and the mode-btn/board-tab class
+        # collision regression (clicking a leaderboard tab must NOT corrupt
+        # __debugState.mode — this actually broke once during development).
+        page = browser.new_page(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+        board_errors = []
+        page.on("pageerror", lambda e: board_errors.append(str(e)))
+        wait_ready(page)
+        page.goto(URL + "?code=TESTQA-1I", wait_until="domcontentloaded")
+        page.wait_for_function("window.__gameReady === true", timeout=15000)
+        page.locator("#identity-screen:not([hidden])").wait_for(timeout=10000)
+        assert page.locator("#identity-manual").is_visible(), "unknown test code should fall back to manual entry"
+        page.locator("#identity-name-input").fill("测试小明")
+        page.locator("#identity-manual-go").click()
+        page.wait_for_function("window.__debugGame.student && window.__debugGame.student.name === '测试小明'")
+        assert page.locator("#leaderboard-btn").is_visible()
+        page.locator("#leaderboard-btn").click()
+        page.locator("#leaderboard-screen:not([hidden])").wait_for(timeout=5000)
+        page.locator('.board-tab[data-board="quiz"]').click()
+        assert page.evaluate("window.__debugState.mode") == "race", "leaderboard tab click must not touch game mode"
+        page.locator("#leaderboard-close").click()
+        page.locator('.diff-btn[data-diff="easy"]').click()
+        wait_started(page)
+        assert page.evaluate("window.__debugState.mode") == "race"
+        page.evaluate("__debugState.matchTime=.001")
+        page.wait_for_function("__debugState.matchOver")
+        assert "环" in page.locator("#end-detail").inner_text(), "race end screen must not fall through to the quiz-mode text"
+        assert not board_errors, board_errors
+        print("class-code identity/leaderboard OK")
+        page.close()
         browser.close()
 
 if __name__ == "__main__":

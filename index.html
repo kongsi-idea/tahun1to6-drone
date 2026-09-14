@@ -279,6 +279,23 @@
   @media (max-height:500px) { #quiz-banner { top:8px; width:46vw; padding:7px 10px; } #quiz-banner .question-text { font-size:16px; } #quiz-banner .question-meta { font-size:10px; margin-bottom:2px; } #quiz-banner .question-phase { font-size:10px; margin-top:4px; } #answer-options { font-size:11px; gap:3px 8px; margin-top:5px; } }
   @media (orientation:portrait) and (max-width:600px) { #quiz-banner { top:108px; width:90vw; } }
   @media (prefers-reduced-motion:reduce) { * { transition:none !important; } }
+
+  #identity-screen, #leaderboard-screen { position:fixed; inset:0; z-index:45; background:#11241bd9; backdrop-filter:blur(8px); display:grid; place-items:center; padding:16px; }
+  #identity-screen[hidden], #leaderboard-screen[hidden] { display:none; }
+  #identity-card, #leaderboard-card { color:#f3f5e8; text-align:center; max-width:420px; width:100%; padding:24px; background:#20372bec; border:1px solid #72916766; border-radius:20px; max-height:82vh; overflow:auto; }
+  #identity-card h2, #leaderboard-card h2 { font-size:20px; margin:0 0 4px; }
+  .board-tab { flex:1; padding:11px 8px; color:#d3dcd5; background:none; border:0; border-radius:8px; font-size:14px; font-weight:700; }
+  .board-tab.active { background:#f0f1e8; color:#243b2b; }
+  .identity-name-btn { display:flex; align-items:center; gap:8px; width:100%; margin:6px 0; padding:12px 14px; border-radius:12px; border:1px solid rgba(220,235,216,.22); background:rgba(246,250,234,.09); color:#f5f6ef; font-size:15px; text-align:left; }
+  .identity-name-btn .seat { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; flex-shrink:0; border-radius:50%; background:#e8b64d; color:#2e2817; font-size:12px; font-weight:800; }
+  #identity-manual input { width:100%; padding:12px; border-radius:10px; border:1px solid #647969; background:#263b30; color:#fff; font-size:15px; margin:10px 0; box-sizing:border-box; }
+  #leaderboard-btn { width:100%; margin-top:8px; }
+  #leaderboard-scope { margin-top:0; }
+  .board-row { display:flex; justify-content:space-between; gap:8px; padding:8px 10px; border-radius:8px; font-size:14px; }
+  .board-row:nth-child(odd) { background:#ffffff0d; }
+  .board-row .rank { color:#e8c875; font-weight:800; width:22px; flex-shrink:0; }
+  .board-row .board-name { flex:1; text-align:left; overflow-wrap:anywhere; }
+  .board-row.me { background:#ffe2a026; color:#ffe2a0; }
 </style>
 </head>
 <body>
@@ -345,6 +362,8 @@
         <div class="settings-line"><label for="map-select">地图</label><select id="map-select"><option value="near">近场</option><option value="standard" selected>标准</option><option value="expedition">远征</option></select><button id="practice-btn">重做飞行试炼</button></div>
         <div class="settings-line"><label for="control-select">操控</label><select id="control-select"><option value="assist">辅助驾驶 · 自动定高</option><option value="pro">专业驾驶 · 双摇杆</option></select><button id="menu-sound" class="mini-btn">声音 开</button></div>
         <p class="menu-note" id="best-note">一场 90 秒 · 无淘汰 · 随时暂停</p>
+        <p class="menu-note" id="identity-note" hidden></p>
+        <button id="leaderboard-btn" class="secondary" hidden>🏆 班级排行榜</button>
         <p id="load-status" role="status">正在准备飞行场…</p>
       </div>
     </div>
@@ -362,6 +381,31 @@
 
   <div id="pause-screen" hidden><div class="pause-card"><p class="eyebrow">TAKE A BREATH</p><h2>歇一歇，随时继续</h2><p id="pause-help"></p><button id="resume-btn" class="primary">继续飞行</button><button id="pause-menu-btn" class="secondary">回竞场</button><p>切换应用时自动暂停，不会偷偷跑掉比赛时间。</p></div></div>
 
+  <div id="identity-screen" hidden>
+    <div id="identity-card">
+      <p class="eyebrow">班级登入</p>
+      <h2 id="identity-title">选你的名字</h2>
+      <div id="identity-grid"></div>
+      <div id="identity-manual" hidden>
+        <input id="identity-name-input" type="text" placeholder="输入你的名字" maxlength="20" />
+        <button class="primary" id="identity-manual-go">开始</button>
+      </div>
+      <button class="secondary" id="identity-skip">跳过，不上排行榜</button>
+    </div>
+  </div>
+
+  <div id="leaderboard-screen" hidden>
+    <div id="leaderboard-card">
+      <div class="mode-switch" id="leaderboard-tabs">
+        <button type="button" class="board-tab active" data-board="race">穿环竞速榜</button>
+        <button type="button" class="board-tab" data-board="quiz">答题竞速榜</button>
+      </div>
+      <p class="menu-note" id="leaderboard-scope"></p>
+      <div id="leaderboard-list"></div>
+      <button class="secondary" id="leaderboard-close">关闭</button>
+    </div>
+  </div>
+
 <script>
 window.addEventListener('error', function(e) {
   const label = document.getElementById('load-status');
@@ -369,6 +413,10 @@ window.addEventListener('error', function(e) {
 });
 setTimeout(function() { const label = document.getElementById('load-status'); if (document.getElementById('start-screen').classList.contains('loading')) label.textContent = '载入比平时久，请检查网络后刷新。'; }, 15000);
 </script>
+
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script defer src="https://kongsi-idea.vercel.app/data/supabase-client.js"></script>
+<script defer src="https://kongsi-idea.vercel.app/data/class-code-client.js"></script>
 
 <script type="importmap">
 { "imports": {
@@ -1685,6 +1733,7 @@ function endMatch() {
   const previous = preferences.best[key] || 0;
   if (!state.practice) preferences.best[key] = Math.max(previous, state.scores.player);
   savePreferences();
+  if (!state.practice) submitScore(state.mode, state.difficulty, state.scores.player);
   document.getElementById("end-detail").textContent = state.practice ? (preferences.onboardingComplete ? "准备好了！试试轻松飞，和三位飞手同场竞速。" : "飞行执照已解锁。接下来选择年级、学科与地图，开始你的飞学挑战。") : state.mode === "race" ? `穿过 ${state.gates} 环 · 精准穿环 ${state.clean} 次 · 最长连续 ${state.bestCombo} 环。${state.scores.player > previous ? "创下本机个人最佳！" : `本机最佳 ${preferences.best[key]} 环。`} ${state.gates === 0 ? "可以先试飞，松手就能稳稳停住。" : "下次试试：直线加速，入弯松手。"}` : `答对 ${state.learning.correct} 题 · 思考飞行积分 ${state.scores.player - state.learning.correct} 分 · 重新尝试 ${state.learning.wrong} 次 · 最长连对 ${state.bestCombo} 题。`;
   releaseControls();
   chime(true);
@@ -1995,7 +2044,7 @@ function updateNavigation() {
   if(!state.practice)state.ais.forEach((d,i)=>{const [x,y]=point(d.pos);mapCtx.fillStyle="#"+AI_COLORS[i].toString(16);mapCtx.beginPath();mapCtx.arc(x,y,3,0,Math.PI*2);mapCtx.fill();});
   const [x,y]=point(state.player.pos);mapCtx.save();mapCtx.translate(x,y);mapCtx.rotate(-state.player.heading);mapCtx.fillStyle="#ffffff";mapCtx.beginPath();mapCtx.moveTo(0,-8);mapCtx.lineTo(5,5);mapCtx.lineTo(0,2);mapCtx.lineTo(-5,5);mapCtx.closePath();mapCtx.fill();mapCtx.restore();
 }
-window.__debugGame = { startGame, endMatch, togglePause, checkGoalCrossing, currentTarget, spawnQuestion, revealAnswerRings, returnToMenu, renderer, scene, camera, preferences, flightInput, get performance(){ return renderBudget; } };
+window.__debugGame = { startGame, endMatch, togglePause, checkGoalCrossing, currentTarget, spawnQuestion, revealAnswerRings, returnToMenu, renderer, scene, camera, preferences, flightInput, get performance(){ return renderBudget; }, get student(){ return student; }, get HAS_DB(){ return HAS_DB; }, submitScore, loadLeaderboard };
 
 /* ---------- 主循环 ---------- */
 // 连续低帧率时先减少后期，再降低渲染分辨率。CSS／触控坐标始终保持原尺寸。
@@ -2086,10 +2135,128 @@ buildCourse(); obstacles.forEach(o=>o.mesh.visible=false);
 document.getElementById("start-screen").classList.remove("loading");
 document.getElementById("load-status").textContent = "飞学竞场已就绪";
 window.__gameReady = true;
-// 首次进入先飞完一段短试炼；完成状态只存在这台装置，之后不会再强迫重做。
-if (!preferences.onboardingComplete) {
-  setTimeout(() => { state.mode = "race"; startGame("easy", true); showMessage("飞行试炼 · 完成 5 个小目标后解锁竞场", 2400); }, 80);
+
+/* ---------- 班级排行榜（可选：只有网址带 ?code= 或本机记住班级代码才会启用，
+   一般访客不受影响，游戏跟接排行榜之前完全一样）---------- */
+const HAS_DB = typeof supabaseClient !== "undefined" && typeof ClassCode !== "undefined";
+let student = null; // { name, classLabel, playCode }
+const DRONE_CODE_KEY = "drone_code";
+
+function withTimeout(p, ms) {
+  return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms || 8000))]);
 }
+function urlClassCode() {
+  try { return (new URLSearchParams(location.search).get("code") || "").trim(); } catch (_) { return ""; }
+}
+function savedClassCode() {
+  try { return localStorage.getItem(DRONE_CODE_KEY) || localStorage.getItem("kelasku_class_code") || ""; } catch (_) { return ""; }
+}
+function saveClassCode(c) { try { localStorage.setItem(DRONE_CODE_KEY, c); } catch (_) {} }
+function escText(s) { return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c])); }
+
+function showIdentityScreen(roster, code) {
+  return new Promise((resolve) => {
+    const screen = document.getElementById("identity-screen");
+    const grid = document.getElementById("identity-grid");
+    const manual = document.getElementById("identity-manual");
+    const manualInput = document.getElementById("identity-name-input");
+    grid.innerHTML = "";
+    manual.hidden = roster.length > 0;
+    document.getElementById("identity-title").textContent = roster.length > 0 ? "选你的名字" : "找不到这个班级名单，先手动输入名字";
+    roster.forEach((r) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "identity-name-btn";
+      b.innerHTML = (r.seatNo != null ? `<span class="seat">${r.seatNo}</span>` : "") + escText(r.name || "");
+      b.addEventListener("click", () => { finish({ name: r.name, classLabel: r.className || code, playCode: r.playCode || code }); });
+      grid.appendChild(b);
+    });
+    function finish(result) { screen.hidden = true; resolve(result); }
+    document.getElementById("identity-manual-go").onclick = () => {
+      const name = manualInput.value.trim();
+      if (!name) return;
+      finish({ name, classLabel: code, playCode: code });
+    };
+    document.getElementById("identity-skip").onclick = () => finish(null);
+    screen.hidden = false;
+  });
+}
+
+async function resolveIdentity() {
+  if (!HAS_DB) return null;
+  const codeParam = urlClassCode();
+  const code = codeParam || savedClassCode();
+  if (!code) return null;
+  try {
+    const roster = await withTimeout(ClassCode.load(code), 10000) || [];
+    saveClassCode(code.toUpperCase());
+    return await showIdentityScreen(roster, code.toUpperCase());
+  } catch (_) { return null; }
+}
+
+function updateIdentityUI() {
+  const note = document.getElementById("identity-note");
+  const btn = document.getElementById("leaderboard-btn");
+  if (student && student.playCode) {
+    note.hidden = false; note.textContent = `现在是 ${student.name}（${student.classLabel || student.playCode}）`;
+    btn.hidden = false;
+  } else {
+    note.hidden = true; btn.hidden = true;
+  }
+}
+
+async function submitScore(mode, difficulty, score) {
+  if (!HAS_DB || !student || !student.playCode) return;
+  try {
+    await withTimeout(supabaseClient.rpc("submit_tahun1to6_drone_score", {
+      p_play_code: student.playCode, p_class_label: student.classLabel || student.playCode,
+      p_name: student.name, p_mode: mode, p_difficulty: difficulty,
+      p_score: Math.max(0, Math.min(999, Math.round(score))),
+    }), 8000);
+  } catch (_) { /* 离线也没关系，本机最佳成绩已经存了，下一局再试着同步 */ }
+}
+
+async function loadLeaderboard(mode, difficulty) {
+  if (!HAS_DB || !student || !student.playCode) return [];
+  try {
+    const res = await withTimeout(supabaseClient.from("tahun1to6_drone_scores")
+      .select("name, score").eq("play_code", student.playCode).eq("mode", mode).eq("difficulty", difficulty)
+      .order("score", { ascending: false }).limit(20), 8000);
+    return res.data || [];
+  } catch (_) { return []; }
+}
+
+let leaderboardTab = "race";
+async function renderLeaderboard() {
+  const list = document.getElementById("leaderboard-list");
+  list.innerHTML = "载入中…";
+  const rows = await loadLeaderboard(leaderboardTab, state.difficulty);
+  list.innerHTML = rows.length === 0
+    ? `<p class="menu-note">这个难度还没有人上榜，飞一局试试！</p>`
+    : rows.map((r, i) => `<div class="board-row${r.name === student.name ? " me" : ""}"><span class="rank">${i + 1}</span><span class="board-name">${escText(r.name)}</span><span>${r.score}${leaderboardTab === "race" ? " 环" : " 分"}</span></div>`).join("");
+}
+document.getElementById("leaderboard-btn").addEventListener("click", () => {
+  if (!student) return;
+  document.getElementById("leaderboard-screen").hidden = false;
+  const diffLabel = state.difficulty === "easy" ? "轻松飞" : state.difficulty === "hard" ? "高手场" : "竞速赛";
+  document.getElementById("leaderboard-scope").textContent = `${student.classLabel || student.playCode} · ${diffLabel}难度`;
+  renderLeaderboard();
+});
+document.getElementById("leaderboard-close").addEventListener("click", () => { document.getElementById("leaderboard-screen").hidden = true; });
+document.querySelectorAll("#leaderboard-tabs .board-tab").forEach(btn => btn.addEventListener("click", () => {
+  leaderboardTab = btn.dataset.board;
+  document.querySelectorAll("#leaderboard-tabs .board-tab").forEach(b => { b.classList.toggle("active", b === btn); b.setAttribute("aria-pressed", String(b === btn)); });
+  renderLeaderboard();
+}));
+
+// 首次进入先飞完一段短试炼；完成状态只存在这台装置，之后不会再强迫重做。
+// 没有班级代码时 resolveIdentity() 立刻回传 null，流程跟接排行榜之前完全一样。
+(async () => {
+  student = await resolveIdentity();
+  updateIdentityUI();
+  if (!preferences.onboardingComplete) {
+    setTimeout(() => { state.mode = "race"; startGame("easy", true); showMessage("飞行试炼 · 完成 5 个小目标后解锁竞场", 2400); }, 80);
+  }
+})();
 </script>
 </body>
 </html>
